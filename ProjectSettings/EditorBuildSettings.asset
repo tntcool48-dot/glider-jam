@@ -6,8 +6,14 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/OutdoorsScene.unity
-    guid: 8124e5870f4fd4c779e7a5f994e84ad1
+    path: Assets/GliderLevel/Scenes/mainUI.unity
+    guid: 5b438fb8ab38cc94693873e41e835874
+  - enabled: 1
+    path: Assets/GliderLevel/Scenes/yazan scene.unity
+    guid: 1ec25dbb53b58b043b9134d5f0173a78
+  - enabled: 1
+    path: Assets/GliderLevel/Scenes/end.unity
+    guid: 2216ea081bc4e7345969d6dc009b6530
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 35845fe01580c41289b024647b1d1c53, type: 3}
   m_UseUCBPForAssetBundles: 0

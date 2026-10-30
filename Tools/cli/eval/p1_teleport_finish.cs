@@ -1,0 +1,13 @@
+var p = UnityEngine.GameObject.Find("/player");
+var rb = p.GetComponent<UnityEngine.Rigidbody>();
+var finish = UnityEngine.GameObject.Find("/portal/Sphere").transform.position;
+var start = finish + new UnityEngine.Vector3(0f, 0f, -270f);
+rb.position = start;
+rb.rotation = UnityEngine.Quaternion.identity;
+p.transform.SetPositionAndRotation(start, UnityEngine.Quaternion.identity);
+rb.linearVelocity = UnityEngine.Vector3.forward * 120f;
+var cam = UnityEngine.GameObject.Find("/Main Camera").transform;
+cam.position = start + new UnityEngine.Vector3(0f, 3f, -10f);
+cam.rotation = UnityEngine.Quaternion.LookRotation(UnityEngine.Vector3.forward);
+var hit = UnityEngine.Physics.Raycast(start, UnityEngine.Vector3.forward, out var info, 270f, ~0, UnityEngine.QueryTriggerInteraction.Ignore);
+return "teleported to " + start.ToString("F0") + " finish=" + finish.ToString("F0") + " solid obstacle ahead: " + (hit ? info.collider.name + " @" + info.distance.ToString("F0") : "none");
