@@ -16,7 +16,7 @@ namespace GliderJam.EditorTools
 		// layer order: 0 = base (cliff, triplanar), 1 = R, 2 = G, 3 = B
 		private static readonly string[] Ids = { "cliff_side", "rocky_terrain_02", "aerial_rocks_02", "mossy_rock" };
 		private static readonly int[] UvMode = { 5, 4, 4, 5 };           // 4 = planar (world XZ), 5 = triplanar
-		private static readonly float[] MetersPerTile = { 18f, 34f, 24f, 12f };
+		private static readonly float[] MetersPerTile = { 29f, 34f, 24f, 15f };
 		private static readonly Color[] Tint =
 		{
 			new Color(0.82f, 0.74f, 0.70f), new Color(0.9f, 1.0f, 0.86f), new Color(0.95f, 0.95f, 0.95f), new Color(0.85f, 0.95f, 0.85f)

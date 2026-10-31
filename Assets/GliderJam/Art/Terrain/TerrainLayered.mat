@@ -444,10 +444,10 @@ Material:
     - _SubsurfaceMask3: 1
     - _SupportDecals: 1
     - _SurfaceType: 0
-    - _TexWorldScale0: 0.055555556
+    - _TexWorldScale0: 0.03448276
     - _TexWorldScale1: 0.029411765
     - _TexWorldScale2: 0.041666668
-    - _TexWorldScale3: 0.083333336
+    - _TexWorldScale3: 0.06666667
     - _TexWorldScaleBlendMask: 1
     - _TexWorldScaleEmissive: 1
     - _Thickness0: 1

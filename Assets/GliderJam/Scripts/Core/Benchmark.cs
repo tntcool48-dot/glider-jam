@@ -18,6 +18,12 @@ namespace GliderJam
 		private float _warmup = 6f;
 		private readonly List<float> _frames = new List<float>(20000);
 		private float _raceStartedAt = -1f;
+		private readonly List<string> _hitches = new List<string>();
+
+		private void OnApplicationFocus(bool focus)
+		{
+			_hitches.Add("focus " + (focus ? "gained" : "lost") + " at frame " + Time.frameCount);
+		}
 
 		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
 		private static void Init()
@@ -35,6 +41,7 @@ namespace GliderJam
 			}
 			QualitySettings.vSyncCount = 0;
 			Application.targetFrameRate = -1;
+			Application.runInBackground = true; // a focus change must not pause the measurement
 			GameSettings.Mode = GameMode.SplitScreen;
 			GameSettings.Showcase = false;
 			SceneManager.LoadScene(GameSettings.RaceScene);
@@ -52,6 +59,10 @@ namespace GliderJam
 			if (t > _warmup && scene == GameSettings.RaceScene)
 			{
 				_frames.Add(Time.unscaledDeltaTime);
+				if (Time.unscaledDeltaTime > 0.05f)
+				{
+					_hitches.Add("hitch " + (Time.unscaledDeltaTime * 1000f).ToString("F0") + " ms at race t=" + t.ToString("F1") + " s, frame " + Time.frameCount);
+				}
 			}
 			if (t > _warmup + _seconds || scene == GameSettings.EndScene)
 			{
@@ -90,6 +101,7 @@ namespace GliderJam
 				foreach (float f in sorted) if (f > 1f / 60f) over++;
 				sb.AppendLine("frames slower than 60 fps: " + (100f * over / n).ToString("F1") + "%");
 			}
+			foreach (string h in _hitches) sb.AppendLine(h);
 			File.WriteAllText(_logPath, sb.ToString());
 			Debug.Log(sb.ToString());
 		}

@@ -329,7 +329,9 @@ namespace GliderJam.World
 			scree = Mathf.Clamp01(scree * (0.7f + 0.6f * WorldNoise.Fbm(x / 40f + 3f, z / 40f, 2)));
 			float streak = WorldNoise.Perlin3(x / 28f, y / 9f, z / 28f);
 			float humidity = WorldNoise.SmoothStep(260f, 30f, y);
-			float moss = WorldNoise.SmoothStep(38f, 52f, slope) * Mathf.Clamp01(0.45f + 1.6f * streak) * (0.25f + 0.75f * humidity);
+			// Moss streaks break up the sandstone banding; more of it low down and in large irregular patches.
+			float patchMoss = WorldNoise.SmoothStep(-0.05f, 0.35f, WorldNoise.Fbm(x / 140f + 9f, z / 140f - 4f, 3));
+			float moss = WorldNoise.SmoothStep(38f, 52f, slope) * Mathf.Clamp01(0.35f + 1.8f * streak + 0.5f * patchMoss) * (0.3f + 0.7f * humidity);
 			// Large-scale breakup on flat ground so the planar textures don't read as a repeating grid from the air.
 			float macroA = WorldNoise.Fbm(x / 230f, z / 230f, 3), macroB = WorldNoise.Fbm(x / 310f - 40f, z / 310f + 17f, 3);
 			scree = Mathf.Max(scree, grass * WorldNoise.SmoothStep(0.3f, 0.55f, macroA) * 0.45f);
