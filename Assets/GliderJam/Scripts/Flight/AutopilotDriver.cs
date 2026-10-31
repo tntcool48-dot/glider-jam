@@ -30,9 +30,9 @@ namespace GliderJam.Flight
 			Vector3 p = route.path[ahead];
 			Vector3 side = Vector3.Cross(Vector3.up, (route.path[Mathf.Min(route.path.Length - 1, ahead + 1)] - route.path[Mathf.Max(0, ahead - 1)]).normalized);
 			p += side * lateralOffset;
-			Vector3 local = transform.InverseTransformPoint(p);
-			float yawErr = Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg;
+			// Yaw error in the horizontal plane (the glider's own frame tilts with the roll).
 			Vector3 to = p - transform.position;
+			float yawErr = Vector3.SignedAngle(Vector3.ProjectOnPlane(transform.forward, Vector3.up), Vector3.ProjectOnPlane(to, Vector3.up), Vector3.up);
 			float pitchWant = Mathf.Atan2(to.y, new Vector2(to.x, to.z).magnitude) * Mathf.Rad2Deg;
 			_glider.inputTurn = Mathf.Clamp(yawErr / 18f, -1f, 1f);
 			_glider.inputPitch = Mathf.Clamp((pitchWant - _glider.PitchAngle) / 10f, -1f, 1f);

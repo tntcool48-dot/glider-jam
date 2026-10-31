@@ -13,7 +13,7 @@ namespace GliderJam.EditorTools
 	public static class AtmosphereSetup
 	{
 		public const string ProfilePath = "Assets/GliderJam/Settings/GoldenHour.asset";
-		private static readonly List<string> Missing = new List<string>();
+		internal static readonly List<string> Missing = new List<string>();
 
 		public static string Run()
 		{
@@ -234,7 +234,7 @@ namespace GliderJam.EditorTools
 			p.boolValue = v;
 		}
 
-		private static T Get<T>(VolumeProfile profile) where T : VolumeComponent
+		internal static T Get<T>(VolumeProfile profile) where T : VolumeComponent
 		{
 			if (!profile.TryGet(out T c))
 			{
@@ -249,7 +249,7 @@ namespace GliderJam.EditorTools
 		}
 
 		// Sets a VolumeParameter field by name (with override) so a renamed field is reported, not a compile error.
-		private static void P(VolumeComponent c, string field, object value)
+		internal static void P(VolumeComponent c, string field, object value)
 		{
 			FieldInfo f = c.GetType().GetField(field, BindingFlags.Public | BindingFlags.Instance);
 			if (f == null)
