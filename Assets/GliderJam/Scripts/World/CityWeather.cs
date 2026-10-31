@@ -14,9 +14,18 @@ namespace GliderJam.World
 		public Renderer[] billboards = new Renderer[0];
 		public Renderer[] flicker = new Renderer[0];
 
+		[Header("Traffic: light streaks along street and sky lanes (one particle system)")]
+		public Material trafficMaterial;
+		public Vector3[] laneFrom = new Vector3[0], laneTo = new Vector3[0];
+		public Color[] laneColor = new Color[0];
+		public float[] laneSpeed = new float[0], laneRate = new float[0];
+
 		private readonly Dictionary<Camera, ParticleSystem> _rain = new Dictionary<Camera, ParticleSystem>();
 		private Material[] _billboardMats = new Material[0];
 		private float _density = 1f;
+		private ParticleSystem _traffic;
+		private float[] _laneAcc = new float[0];
+		private float _trafficRate = 1f;
 
 		public static void ApplyQuality(GameConfig cfg)
 		{
@@ -28,10 +37,12 @@ namespace GliderJam.World
 			if (backdrop != null) backdrop.SetActive(cfg.backdrop > 0);
 			_density = new[] { 0.35f, 0.7f, 1f }[Mathf.Clamp(cfg.effects, 0, 2)];
 			foreach (ParticleSystem ps in _rain.Values) if (ps != null) SetRate(ps);
+			_trafficRate = new[] { 0.3f, 0.6f, 1f }[Mathf.Clamp(cfg.effects, 0, 2)];
 		}
 
 		private void Start()
 		{
+			if (trafficMaterial != null && laneFrom.Length > 0) MakeTraffic();
 			Apply(GameConfig.Current);
 			_billboardMats = new Material[billboards.Length];
 			for (int i = 0; i < billboards.Length; i++) _billboardMats[i] = billboards[i].material;
@@ -48,6 +59,19 @@ namespace GliderJam.World
 			{
 				if (_rain.ContainsKey(cam) || cam.GetComponent<FollowCamera>() == null) continue;
 				_rain[cam] = MakeRain(cam);
+			}
+
+			if (_traffic != null)
+			{
+				for (int i = 0; i < _laneAcc.Length; i++)
+				{
+					_laneAcc[i] += laneRate[i] * _trafficRate * Time.deltaTime;
+					while (_laneAcc[i] >= 1f)
+					{
+						_laneAcc[i] -= 1f;
+						EmitCar(i, 0f);
+					}
+				}
 			}
 
 			float t = Time.time;
@@ -105,6 +129,58 @@ namespace GliderJam.World
 			SetRate(ps);
 			ps.Play();
 			return ps;
+		}
+
+		private void MakeTraffic()
+		{
+			var go = new GameObject("Traffic");
+			go.transform.SetParent(transform, false);
+			_traffic = go.AddComponent<ParticleSystem>();
+			_traffic.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+			var main = _traffic.main;
+			main.loop = true;
+			main.playOnAwake = false;
+			main.simulationSpace = ParticleSystemSimulationSpace.World;
+			main.maxParticles = 16000;
+			main.startSpeed = 0f;
+			var e = _traffic.emission;
+			e.enabled = false;
+			var shape = _traffic.shape;
+			shape.enabled = false;
+			var r = go.GetComponent<ParticleSystemRenderer>();
+			r.renderMode = ParticleSystemRenderMode.Stretch;
+			r.velocityScale = 0.25f; // light streaks
+			r.lengthScale = 2f;
+			r.sharedMaterial = trafficMaterial;
+			r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+			r.receiveShadows = false;
+			_traffic.Play();
+			// Pre-fill every lane so the city is busy from the first frame.
+			_laneAcc = new float[laneFrom.Length];
+			for (int i = 0; i < laneFrom.Length; i++)
+			{
+				float life = Vector3.Distance(laneFrom[i], laneTo[i]) / laneSpeed[i];
+				int n = Mathf.RoundToInt(life * laneRate[i]);
+				for (int k = 0; k < n; k++) EmitCar(i, Random.value);
+			}
+		}
+
+		// One vehicle light on lane i, `along` (0..1) of the way down it.
+		private void EmitCar(int i, float along)
+		{
+			Vector3 a = laneFrom[i], b = laneTo[i];
+			float len = Vector3.Distance(a, b);
+			Vector3 dir = (b - a) / len;
+			var p = new ParticleSystem.EmitParams
+			{
+				position = a + dir * (len * along) + new Vector3(Random.Range(-1.5f, 1.5f), 0f, Random.Range(-1.5f, 1.5f)),
+				velocity = dir * laneSpeed[i] * Random.Range(0.85f, 1.15f),
+				startLifetime = len * (1f - along) / laneSpeed[i],
+				startSize = Random.Range(1f, 1.5f),
+				startColor = laneColor[i],
+				applyShapeToPosition = false
+			};
+			_traffic.Emit(p, 1);
 		}
 
 		private void SetRate(ParticleSystem ps)

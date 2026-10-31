@@ -117,8 +117,28 @@ namespace GliderJam.Flight
 			_rb.MoveRotation(rot);
 			_rb.linearVelocity = Vector3.Lerp(_rb.linearVelocity, rot * Vector3.forward * Speed, 1f - Mathf.Exp(-20f * dt));
 
-			// Above the ceiling or off the course: short countdown, then the glider is destroyed.
+			// At 110-145 m/s the glider moves 2-3 m per physics step and can slip under a terrain heightfield's surface
+			// (it then only "hits" on the way out). Sweep the fuselage along this step, and treat being below the
+			// terrain surface (e.g. still inside a pillar when respawn invulnerability ends) as a crash.
 			Vector3 at = _rb.position;
+			if (Ghost <= 0f)
+			{
+				Vector3 step = _rb.linearVelocity * dt;
+				float dist = step.magnitude;
+				if (dist > 0.01f && Physics.SphereCast(at, 0.45f, step / dist, out RaycastHit hit, dist + 0.5f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
+					&& hit.collider.attachedRigidbody == null) // static world only (not gliders or crash debris)
+				{
+					Crash(hit.point);
+					return;
+				}
+				if (BelowTerrain(at))
+				{
+					Crash(at);
+					return;
+				}
+			}
+
+			// Above the ceiling or off the course: short countdown, then the glider is destroyed.
 			AboveCeiling = at.y > ceiling;
 			if ((AboveCeiling || at.x < minX || at.x > maxX || at.z < minZ) && Ghost <= 0f)
 			{
@@ -131,9 +151,29 @@ namespace GliderJam.Flight
 			}
 		}
 
+		private static Terrain[] _terrains = new Terrain[0];
+		private static int _terrainFrame = -1000;
+
+		private static bool BelowTerrain(Vector3 p)
+		{
+			if (Time.frameCount - _terrainFrame > 300) // refresh the terrain list now and then (scene changes)
+			{
+				_terrains = Terrain.activeTerrains;
+				_terrainFrame = Time.frameCount;
+			}
+			foreach (Terrain t in _terrains)
+			{
+				if (t == null) continue;
+				Vector3 o = t.transform.position, s = t.terrainData.size;
+				if (p.x < o.x || p.x > o.x + s.x || p.z < o.z || p.z > o.z + s.z) continue;
+				return p.y < o.y + t.SampleHeight(p) - 0.5f;
+			}
+			return false;
+		}
+
 		private void OnCollisionEnter(Collision collision)
 		{
-			if (Crashed || Ghost > 0f || collision.collider.GetComponentInParent<GliderController>() != null) return;
+			if (Crashed || Ghost > 0f || collision.rigidbody != null) return; // other gliders and crash debris don't count
 			Crash(collision.GetContact(0).point);
 		}
 
