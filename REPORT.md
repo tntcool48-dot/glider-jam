@@ -22,6 +22,7 @@ RX 7900 XT / Ryzen 7 9700X.
 | Glider: wing flex, vapor at high G, canopy reflections, panel lines (no decals, no instruments) | Done | `Flight/WingFlex.cs`, `GliderVisuals.cs`, `Editor/GliderBuilder.cs` |
 | Free music | 3 tracks by Kevin MacLeod (CC BY 4.0), cross-faded: menu, canyon, city | `Audio/`, `MUSIC_CREDITS.md` |
 | Great-looking UI | UI kit (Rajdhani font, rounded panels, accent bars), settings screen, pause menu, warnings, finish marker, map name on the results | `Scripts/UI/` |
+| FPS counter, top left | Settings > Display > FPS COUNTER: frame rate and frame time, green 60+ / yellow 30+ / red below, in menus and races | `UI/FpsCounter.cs` |
 | Outer terrain: keep it, optimize, measure | Kept. No shadows, no colliders, one LOD in the ray tracing scene; "Distant landscape" setting (Off / Low / High). Costs nothing measurable (below) | `World/MeshTerrain.cs` |
 | Make the canyon look better | Done: river over the valley floor, seven waterfalls, circling bird flocks, sunlit dust motes, drifting 3D-noise mist, sharper cumulus, 42 extra spires / fins. Not done: vines, denser pillar-top forest, second rock texture | `World/CanyonAmbience.cs`, `Editor/CanyonSetup.cs` |
 
@@ -71,6 +72,8 @@ shallow dive into a slope, vertical dive: all stop at the surface. Crash debris 
   material. Split-screen with all three ray traced effects fell to single digits, and twice the AMD driver failed to
   build the ray tracing pipeline (out of memory, `0x8007000E`). The city, with simpler materials, was fine.
 - So Ultra + Ray Tracing now ray traces reflections only; terrain chunks put one LOD each into the ray tracing scene.
+- Even reflections only were too much for the canyon in split-screen (4.6 fps), so that one combination falls back
+  to screen-space effects automatically; solo races, the city and the menu flyover keep ray tracing.
   Ultra without ray tracing is the recommended top setting.
 
 ## Benchmarks (1920x1080 fullscreen, autopilot race, vsync off)
@@ -97,7 +100,17 @@ GPU 5.58 / 5.52 ms vs 5.54 / 5.33 ms: within noise. After the optimization the o
 
 Final build (harder maps, Ultra RT = ray traced reflections only):
 
-V3_PLACEHOLDER
+| run | avg fps | 1% low | GPU ms | CPU ms | frames < 60 fps |
+|---|---|---|---|---|---|
+| canyon split High | 139.5 | 29.2 | 6.09 | 6.58 | 0.8% |
+| city split High (maze) | 151.6 | 56.0 | 5.87 | 4.58 | 1.1% |
+| canyon split Ultra RT (automatic screen-space fallback) | 88.4 | 71.6 | 11.17 | 7.44 | 0.2% |
+| city split Ultra RT (RT reflections) | 74.2 | 34.6 | 12.67 | 7.67 | 12.8% |
+| canyon solo Ultra RT (RT reflections) | 58.8 | 11.9 | 11.36 | 10.63 | 35.7% |
+
+Split-screen 1080p holds 60 fps on High (and Ultra) on both maps. With ray tracing, only the city in solo stays
+reliably above 60; the canyon solo run hitches while the ray tracing scene warms up (an 0.8 s stall in the first
+seconds) and stays borderline.
 
 ## Downloads (this round)
 
