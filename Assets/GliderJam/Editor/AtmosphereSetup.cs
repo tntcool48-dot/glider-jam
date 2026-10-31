@@ -103,15 +103,15 @@ namespace GliderJam.EditorTools
 			P(vignette, "smoothness", 0.5f);
 
 			var blur = Get<MotionBlur>(profile);
-			P(blur, "intensity", 0.35f);
-			P(blur, "maximumVelocity", 160f);
+			P(blur, "intensity", 0.15f);
+			P(blur, "maximumVelocity", 90f);
 
 			var grain = Get<FilmGrain>(profile);
 			P(grain, "type", FilmGrainLookup.Thin1);
 			P(grain, "intensity", 0.12f);
 
 			var shadows = Get<HDShadowSettings>(profile);
-			P(shadows, "maxShadowDistance", 2500f);
+			P(shadows, "maxShadowDistance", 1600f);
 			P(shadows, "cascadeShadowSplitCount", 4);
 
 			var contact = Get<ContactShadows>(profile);

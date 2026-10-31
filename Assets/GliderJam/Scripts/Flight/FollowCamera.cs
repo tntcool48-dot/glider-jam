@@ -22,6 +22,7 @@ namespace GliderJam.Flight
 		private float _shake;
 		private Vector3 _crashPoint;
 		private Vector3 _smoothedUp = Vector3.up;
+		private Vector3 _dir;
 
 		private void Awake()
 		{
@@ -35,6 +36,7 @@ namespace GliderJam.Flight
 			transform.position = t.position - t.forward * distance + Vector3.up * height;
 			transform.rotation = Quaternion.LookRotation(t.position + t.forward * lookAhead - transform.position);
 			_smoothedUp = Vector3.up;
+			_dir = t.forward;
 		}
 
 		public void AddShake(float amount)
@@ -65,13 +67,15 @@ namespace GliderJam.Flight
 				return;
 			}
 
-			// Flatten the glider's forward so steep pitch doesn't swing the camera wildly.
+			// Smooth the viewing direction (not the position) so the distance stays constant at any speed.
+			// The glider's forward is partly flattened so steep pitch doesn't swing the camera wildly.
 			Vector3 fwd = t.forward;
 			Vector3 flat = Vector3.ProjectOnPlane(fwd, Vector3.up).normalized;
-			Vector3 dir = Vector3.Slerp(flat, fwd, 0.55f).normalized;
+			Vector3 wantDir = Vector3.Slerp(flat, fwd, 0.55f).normalized;
+			_dir = _dir == Vector3.zero ? wantDir : Vector3.Slerp(_dir, wantDir, 1f - Mathf.Exp(-followSharpness * 0.6f * dt)).normalized;
 			float speedK = target.SpeedNormalized;
-			float dist = distance * Mathf.Lerp(0.95f, 1.15f, speedK);
-			Vector3 desired = t.position - dir * dist + Vector3.up * height;
+			float dist = distance * Mathf.Lerp(0.95f, 1.12f, speedK);
+			Vector3 desired = t.position - _dir * dist + Vector3.up * height;
 
 			// Keep line of sight: pull in if rock is between the glider and the camera.
 			Vector3 toCam = desired - t.position;
@@ -81,7 +85,9 @@ namespace GliderJam.Flight
 				desired = t.position + toCam.normalized * Mathf.Max(3f, hit.distance - 0.5f);
 			}
 
-			transform.position = Vector3.Lerp(transform.position, desired, 1f - Mathf.Exp(-followSharpness * dt));
+			// Small residual smoothing on top of the glider's own motion (relative, so no speed-dependent lag).
+			Vector3 rel = Vector3.Lerp(transform.position - t.position, desired - t.position, 1f - Mathf.Exp(-followSharpness * 2f * dt));
+			transform.position = t.position + rel;
 			_smoothedUp = Vector3.Slerp(_smoothedUp, Vector3.Slerp(Vector3.up, t.up, bankLean), 1f - Mathf.Exp(-4f * dt));
 			Vector3 lookPoint = t.position + fwd * lookAhead;
 			Quaternion want = Quaternion.LookRotation(lookPoint - transform.position, _smoothedUp);

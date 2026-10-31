@@ -14,14 +14,14 @@ namespace GliderJam.World
 		public Material material;
 
 		[Header("Corridor (from Unity Terrain tiles)")]
-		public int chunkCells = 64;
+		public int chunkCells = 128;
 
 		[Header("Surrounding landscape")]
 		public bool buildOuter = true;
 		public Vector2 outerMin = new Vector2(-5000f, -4000f);
 		public Vector2 outerMax = new Vector2(6000f, 11000f);
-		public float outerChunkSize = 500f;
-		public int outerChunkCells = 32;
+		public float outerChunkSize = 1000f;
+		public int outerChunkCells = 48;
 
 		[Header("Misc")]
 		public float skirtDepth = 8f;
@@ -346,7 +346,7 @@ namespace GliderJam.World
 			go.isStatic = false;
 			var lodGroup = go.AddComponent<LODGroup>();
 			var lods = new LOD[3];
-			float[] thresholds = job.corridor ? new[] { 0.32f, 0.11f, 0f } : new[] { 0.28f, 0.09f, 0f };
+			float[] thresholds = job.corridor ? new[] { 0.5f, 0.16f, 0f } : new[] { 0.45f, 0.14f, 0f };
 			for (int l = 0; l < 3; l++)
 			{
 				var child = new GameObject("LOD" + l) { hideFlags = HideFlags.DontSave };

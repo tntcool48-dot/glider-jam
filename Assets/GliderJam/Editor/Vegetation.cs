@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using GliderJam.World;
 using UnityEditor;
 using UnityEngine;
@@ -121,6 +122,22 @@ namespace GliderJam.EditorTools
 				t.Flush();
 				total += list.Count;
 			}
+			// Trees are drawn by the instanced forest renderer, not per tree by the terrain.
+			foreach (Material m in new[] { "ConiferBark", "ConiferFoliage0", "ConiferFoliage1", "ConiferFoliage2", "ConiferFoliage3" }
+				.Select(n => AssetDatabase.LoadAssetAtPath<Material>(Dir + "/" + n + ".mat")))
+			{
+				if (m == null) continue;
+				m.enableInstancing = true;
+				EditorUtility.SetDirty(m);
+			}
+			var forestGo = GameObject.Find("/Forest") ?? new GameObject("Forest");
+			var inst = forestGo.GetComponent<GliderJam.World.InstancedForest>();
+			if (inst == null) inst = forestGo.AddComponent<GliderJam.World.InstancedForest>();
+			inst.shadowDistance = 650f;
+			inst.cullDistance = 3500f;
+			inst.lod0Distance = 320f;
+			inst.Build();
+			UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(forestGo.scene);
 			AssetDatabase.SaveAssets();
 			return "trees placed: " + total;
 		}

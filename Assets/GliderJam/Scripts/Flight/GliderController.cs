@@ -106,7 +106,7 @@ namespace GliderJam.Flight
 			float pitchTarget = PitchAngle + inputPitch * pitchRate * dt;
 			if (Mathf.Abs(inputPitch) < 0.05f)
 			{
-				pitchTarget = Mathf.MoveTowards(pitchTarget, 0f, 6f * dt); // gentle auto-level
+				pitchTarget = Mathf.MoveTowards(pitchTarget, 0f, 20f * dt); // hands-off: return to level flight
 			}
 			PitchAngle = Mathf.Clamp(pitchTarget, -maxPitch, maxPitch);
 

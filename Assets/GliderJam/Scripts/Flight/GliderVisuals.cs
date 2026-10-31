@@ -37,8 +37,8 @@ namespace GliderJam.Flight
 			tail.SetParent(_visual, false);
 			tail.localPosition = new Vector3(0f, 0.25f, -4.7f);
 			_trail = MakeTrail(tail, trailMaterial, playerColor, 0.55f, 2.4f, 0.55f);
-			_vaporL = MakeTrail(Find("TipTrailL"), vaporMaterial, Color.white, 0.18f, 0.7f, 0.35f);
-			_vaporR = MakeTrail(Find("TipTrailR"), vaporMaterial, Color.white, 0.18f, 0.7f, 0.35f);
+			_vaporL = MakeTrail(Find("TipTrailL"), vaporMaterial, Color.white, 0.16f, 0.4f, 0.3f);
+			_vaporR = MakeTrail(Find("TipTrailR"), vaporMaterial, Color.white, 0.16f, 0.4f, 0.3f);
 		}
 
 		private Transform Find(string name)
@@ -57,7 +57,7 @@ namespace GliderJam.Flight
 			tr.time = time;
 			tr.minVertexDistance = 1.5f;
 			// Thin at the glider, widening and fading as it dissipates.
-			tr.widthCurve = new AnimationCurve(new Keyframe(0f, width * 0.3f), new Keyframe(0.25f, width), new Keyframe(1f, width * 2.2f));
+			tr.widthCurve = new AnimationCurve(new Keyframe(0f, width * 0.3f), new Keyframe(0.25f, width), new Keyframe(1f, width * 1.4f));
 			var g = new Gradient();
 			g.SetKeys(new[] { new GradientColorKey(color, 0f), new GradientColorKey(color, 1f) },
 				new[] { new GradientAlphaKey(alpha, 0f), new GradientAlphaKey(alpha * 0.45f, 0.4f), new GradientAlphaKey(0f, 1f) });

@@ -64,7 +64,7 @@ namespace GliderJam.Race
 			scaler.matchWidthOrHeight = 1f;
 
 			Vector3 start = route.path[0];
-			Vector3 fwd = (route.path[3] - route.path[0]).normalized;
+			Vector3 fwd = Vector3.ProjectOnPlane(route.path[3] - route.path[0], Vector3.up).normalized; // level start
 			Vector3 right = Vector3.Cross(Vector3.up, fwd).normalized;
 			var cams = new List<FollowCamera>();
 			for (int i = 0; i < count; i++)
@@ -171,7 +171,11 @@ namespace GliderJam.Race
 					Respawn(p);
 				}
 				p.pathHint = route.ClosestIndex(pos, p.pathHint, 25);
-				p.progress = p.finished ? 1e6f - p.finishTime : p.nextCp * 10000f + p.pathHint;
+				// Continuous progress: checkpoint count, then path sample, then position along the local tangent.
+				int h = Mathf.Min(p.pathHint, route.path.Length - 2);
+				Vector3 tangent = route.path[h + 1] - route.path[h];
+				float along = Vector3.Dot(pos - route.path[h], tangent.normalized) / Mathf.Max(1f, tangent.magnitude);
+				p.progress = p.finished ? 1e6f - p.finishTime : p.nextCp * 10000f + h + along;
 				float speed = p.glider.Crashed ? 0f : p.glider.Speed;
 				p.wind.volume = Mathf.Lerp(0.15f, 0.55f, p.glider.SpeedNormalized) * (p.glider.Crashed ? 0f : 1f) / _players.Count;
 				p.wind.pitch = Mathf.Lerp(0.8f, 1.25f, p.glider.SpeedNormalized);
@@ -297,7 +301,7 @@ namespace GliderJam.Race
 			p.respawnAt = -1f;
 			int pathIndex = p.nextCp == 0 ? 0 : route.checkpoints[p.nextCp - 1];
 			Vector3 pos = route.path[pathIndex];
-			Vector3 fwd = (route.path[Mathf.Min(route.path.Length - 1, pathIndex + 3)] - pos).normalized;
+			Vector3 fwd = Vector3.ProjectOnPlane(route.path[Mathf.Min(route.path.Length - 1, pathIndex + 3)] - pos, Vector3.up).normalized;
 			p.glider.Respawn(pos, Quaternion.LookRotation(fwd));
 			p.pathHint = pathIndex;
 			p.prevPos = pos;

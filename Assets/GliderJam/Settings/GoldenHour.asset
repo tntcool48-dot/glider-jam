@@ -406,7 +406,7 @@ MonoBehaviour:
   interCascadeBorders: 1
   maxShadowDistance:
     m_OverrideState: 1
-    m_Value: 2500
+    m_Value: 1600
   directionalTransmissionMultiplier:
     m_OverrideState: 0
     m_Value: 1
@@ -785,10 +785,10 @@ MonoBehaviour:
     m_Value: 1
   intensity:
     m_OverrideState: 1
-    m_Value: 0.35
+    m_Value: 0.15
   maximumVelocity:
     m_OverrideState: 1
-    m_Value: 160
+    m_Value: 90
   minimumVelocity:
     m_OverrideState: 0
     m_Value: 2

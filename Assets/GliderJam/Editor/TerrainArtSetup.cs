@@ -117,6 +117,10 @@ namespace GliderJam.EditorTools
 				mt = go.AddComponent<MeshTerrain>();
 			}
 			mt.material = AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
+			// Large chunks keep draw calls low (each chunk is drawn per camera and per shadow cascade).
+			mt.chunkCells = 128;
+			mt.outerChunkSize = 1000f;
+			mt.outerChunkCells = 48;
 			mt.Rebuild();
 			UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(go.scene);
 			return "MeshTerrain chunks: " + go.transform.GetChild(0).childCount;

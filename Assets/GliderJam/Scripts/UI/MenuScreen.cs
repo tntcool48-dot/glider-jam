@@ -97,7 +97,7 @@ namespace GliderJam.UI
 			var rt = (RectTransform)go.transform;
 			rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0f, 1f);
 			rt.anchoredPosition = pos;
-			rt.sizeDelta = new Vector2(520f, 82f);
+			rt.sizeDelta = new Vector2(640f, 82f);
 			var img = go.GetComponent<Image>();
 			img.color = Color.white;
 			var b = go.GetComponent<Button>();
@@ -129,6 +129,7 @@ namespace GliderJam.UI
 			t.fontSize = 36f;
 			t.fontStyle = FontStyles.Bold | FontStyles.Italic;
 			t.alignment = TextAlignmentOptions.MidlineLeft;
+			t.textWrappingMode = TextWrappingModes.NoWrap;
 			t.color = Color.white;
 			if (_first == null) _first = b;
 			return b;
