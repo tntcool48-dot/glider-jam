@@ -1,0 +1,16 @@
+var prof = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>("Assets/GliderJam/Settings/GoldenHour.asset");
+prof.TryGet(out UnityEngine.Rendering.HighDefinition.VolumetricClouds c);
+var preset = typeof(UnityEngine.Rendering.HighDefinition.VolumetricClouds).GetProperty("cloudPreset");
+preset.SetValue(c, System.Enum.Parse(preset.PropertyType, "Custom"));
+c.densityMultiplier.overrideState = true; c.densityMultiplier.value = /*DENS*/f;
+c.shapeFactor.overrideState = true; c.shapeFactor.value = /*SHAPE*/f;
+c.shapeScale.overrideState = true; c.shapeScale.value = 2.4f;
+c.erosionFactor.overrideState = true; c.erosionFactor.value = 0.8f;
+c.erosionScale.overrideState = true; c.erosionScale.value = 90f;
+c.bottomAltitude.overrideState = true; c.bottomAltitude.value = 330f;
+c.altitudeRange.overrideState = true; c.altitudeRange.value = 1200f;
+prof.TryGet(out UnityEngine.Rendering.HighDefinition.Exposure e);
+e.compensation.overrideState = true; e.compensation.value = /*EXP*/f;
+UnityEditor.EditorUtility.SetDirty(prof);
+UnityEditor.AssetDatabase.SaveAssets();
+return "density=" + c.densityMultiplier.value + " shape=" + c.shapeFactor.value + " exp=" + e.compensation.value;

@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f3867f585f35ff040bac9bcc40c7d7b8, type: 3}
+  m_Name: FxLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::GliderJam.FxLibrary
+  gliderPrefabs:
+  - {fileID: 3468405424490082020, guid: 42f7e977ba81fe042aa751b401da1757, type: 3}
+  - {fileID: 3298427707997077627, guid: 73ec58e305c17ff4b9facc50b4009027, type: 3}
+  trail: {fileID: 2100000, guid: 47bbae7dd314bc44384be09a3f73c3ac, type: 2}
+  vapor: {fileID: 2100000, guid: a22ff494aa62d9b48b5b56e773c4df8b, type: 2}
+  fire: {fileID: 2100000, guid: 9820cd5d023b4594083d3d7c6fd2144c, type: 2}
+  smoke: {fileID: 2100000, guid: b7207e77cc0b6354ab99d510f1e301af, type: 2}
+  spark: {fileID: 2100000, guid: 53a7460fd8233d24a81261acc5b8d482, type: 2}
+  ring: {fileID: 2100000, guid: c30474ee27b17c945a8fd1ae17b7cd49, type: 2}
+  ringFinish: {fileID: 2100000, guid: 63daa2096e93cd14e8cbbedff42e76de, type: 2}
+  ringGlow: {fileID: 2100000, guid: bc2ab084581393846b4b0004e5ac0825, type: 2}
+  explosionClip: {fileID: 8300000, guid: da34c6b455e81f14f99a77fa845cdf9d, type: 3}
+  windClip: {fileID: 8300000, guid: 313e6e57fa70db34ebae1389558d3a14, type: 3}
+  engineClip: {fileID: 8300000, guid: 20f93d425a3774646bd974456359aa1f, type: 3}

@@ -1,0 +1,279 @@
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace GliderJam.UI
+{
+	// One player's HUD, laid out inside that player's viewport (split-screen aware).
+	public class PlayerHUD : MonoBehaviour
+	{
+		private static Sprite _circle, _ring, _triangle, _diamond, _pill;
+
+		private RectTransform _root;
+		private Camera _cam;
+		private Color _color;
+		private TextMeshProUGUI _position, _positionOf, _cp, _timer, _speed, _message, _sub, _otherLabel, _nextLabel;
+		private Image _boostFill, _otherMarker, _otherArrow, _nextMarker, _nextArrow;
+		private RectTransform _otherGroup, _nextGroup;
+		private float _messageUntil;
+
+		public void Init(Canvas canvas, Camera cam, int player, int playerCount, Rect viewport)
+		{
+			BuildSprites();
+			_cam = cam;
+			_color = GameSettings.PlayerColors[player];
+			_root = New("HUD P" + (player + 1), canvas.transform);
+			_root.anchorMin = viewport.min;
+			_root.anchorMax = viewport.max;
+			_root.offsetMin = _root.offsetMax = Vector2.zero;
+			float s = playerCount > 1 ? 0.8f : 1f; // tighter layout per half screen
+
+			// Top-left: position and checkpoints
+			RectTransform tl = Panel(_root, new Vector2(0f, 1f), new Vector2(28f, -24f), new Vector2(250f, 120f) * s);
+			_position = Text(tl, "1ST", 64 * s, new Vector2(18f * s, -6f * s), TextAlignmentOptions.TopLeft, Color.white, FontStyles.Bold | FontStyles.Italic);
+			_positionOf = Text(tl, playerCount > 1 ? "/ 2" : "SOLO", 24 * s, new Vector2(150f * s, -40f * s), TextAlignmentOptions.TopLeft, new Color(1f, 1f, 1f, 0.6f), FontStyles.Bold);
+			_cp = Text(tl, "CP 0/0", 24 * s, new Vector2(18f * s, -80f * s), TextAlignmentOptions.TopLeft, new Color(1f, 1f, 1f, 0.85f), FontStyles.Bold);
+			Accent(tl, _color);
+
+			// Top-right: timer
+			RectTransform tr = Panel(_root, new Vector2(1f, 1f), new Vector2(-28f, -24f), new Vector2(260f, 84f) * s);
+			Text(tr, "TIME", 18 * s, new Vector2(18f * s, -8f * s), TextAlignmentOptions.TopLeft, new Color(1f, 1f, 1f, 0.6f), FontStyles.Bold);
+			_timer = Text(tr, "00:00.00", 44 * s, new Vector2(18f * s, -26f * s), TextAlignmentOptions.TopLeft, Color.white, FontStyles.Bold);
+			Accent(tr, _color);
+
+			// Bottom-left: speed and boost
+			RectTransform bl = Panel(_root, new Vector2(0f, 0f), new Vector2(28f, 24f), new Vector2(300f, 92f) * s);
+			_speed = Text(bl, "0", 52 * s, new Vector2(18f * s, -6f * s), TextAlignmentOptions.TopLeft, Color.white, FontStyles.Bold | FontStyles.Italic);
+			Text(bl, "KM/H", 20 * s, new Vector2(150f * s, -30f * s), TextAlignmentOptions.TopLeft, new Color(1f, 1f, 1f, 0.6f), FontStyles.Bold);
+			RectTransform barBg = New("BoostBg", bl);
+			barBg.anchorMin = barBg.anchorMax = new Vector2(0f, 1f);
+			barBg.pivot = new Vector2(0f, 1f);
+			barBg.anchoredPosition = new Vector2(18f * s, -70f * s);
+			barBg.sizeDelta = new Vector2(264f * s, 10f * s);
+			barBg.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.15f);
+			RectTransform fill = New("BoostFill", barBg);
+			fill.anchorMin = Vector2.zero;
+			fill.anchorMax = Vector2.one;
+			fill.offsetMin = fill.offsetMax = Vector2.zero;
+			_boostFill = fill.gameObject.AddComponent<Image>();
+			_boostFill.color = _color;
+			_boostFill.type = Image.Type.Filled;
+			_boostFill.fillMethod = Image.FillMethod.Horizontal;
+			_boostFill.sprite = _pill;
+			Accent(bl, _color);
+
+			// Player tag (split-screen only)
+			if (playerCount > 1)
+			{
+				RectTransform tag = Panel(_root, new Vector2(0.5f, 1f), new Vector2(0f, -24f), new Vector2(170f, 40f) * s);
+				tag.pivot = new Vector2(0.5f, 1f);
+				tag.GetComponent<Image>().color = new Color(_color.r, _color.g, _color.b, 0.85f);
+				Text(tag, GameSettings.PlayerNames[player], 22 * s, new Vector2(0f, -7f * s), TextAlignmentOptions.Top, Color.white, FontStyles.Bold).rectTransform.sizeDelta = new Vector2(170f * s, 30f);
+			}
+
+			// Center messages
+			_message = Text(_root, "", 110 * s, Vector2.zero, TextAlignmentOptions.Center, Color.white, FontStyles.Bold | FontStyles.Italic);
+			Center(_message.rectTransform, new Vector2(0f, 60f * s), new Vector2(1400f, 160f));
+			_sub = Text(_root, "", 30 * s, Vector2.zero, TextAlignmentOptions.Center, new Color(1f, 1f, 1f, 0.9f), FontStyles.Bold);
+			Center(_sub.rectTransform, new Vector2(0f, -30f * s), new Vector2(1400f, 50f));
+
+			// Markers
+			// The other player's marker and arrow use the other player's color.
+			Color other = GameSettings.PlayerColors[1 - Mathf.Clamp(player, 0, 1)];
+			_otherGroup = New("OtherMarker", _root);
+			_otherMarker = Icon(_otherGroup, _diamond, 26f, other);
+			_otherLabel = Text(_otherGroup, "", 20, new Vector2(0f, 34f), TextAlignmentOptions.Bottom, other, FontStyles.Bold);
+			_otherLabel.rectTransform.anchorMin = _otherLabel.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+			_otherLabel.rectTransform.pivot = new Vector2(0.5f, 0f);
+			_otherLabel.rectTransform.anchoredPosition = new Vector2(0f, 16f);
+			_otherLabel.outlineWidth = 0.25f;
+			_otherLabel.outlineColor = new Color32(0, 0, 0, 200);
+			_otherArrow = Icon(_root, _triangle, 34f, other);
+			_nextGroup = New("NextCheckpoint", _root);
+			_nextMarker = Icon(_nextGroup, _ring, 34f, new Color(1f, 0.9f, 0.7f, 0.9f));
+			_nextLabel = Text(_nextGroup, "", 18, Vector2.zero, TextAlignmentOptions.Top, new Color(1f, 0.95f, 0.85f), FontStyles.Bold);
+			_nextLabel.rectTransform.anchorMin = _nextLabel.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+			_nextLabel.rectTransform.pivot = new Vector2(0.5f, 1f);
+			_nextLabel.rectTransform.anchoredPosition = new Vector2(0f, -22f);
+			_nextArrow = Icon(_root, _triangle, 26f, new Color(1f, 0.9f, 0.7f, 0.9f));
+			_otherGroup.gameObject.SetActive(playerCount > 1);
+			_otherArrow.gameObject.SetActive(false);
+			_nextArrow.gameObject.SetActive(false);
+		}
+
+		public void SetStats(int rank, int cp, int cpTotal, float time, float speedMs, float boost)
+		{
+			string[] suffix = { "ST", "ND", "RD", "TH" };
+			_position.text = rank + "<size=55%>" + suffix[Mathf.Clamp(rank - 1, 0, 3)] + "</size>";
+			_cp.text = "CP " + cp + "/" + cpTotal;
+			_timer.text = GameSettings.FormatTime(Mathf.Max(0f, time)).Replace("--:--.--", "00:00.00");
+			_speed.text = Mathf.RoundToInt(speedMs * 3.6f).ToString();
+			_boostFill.fillAmount = boost;
+		}
+
+		public void ShowMessage(string text, string sub, Color color, float seconds)
+		{
+			_message.text = text;
+			_message.color = color;
+			_sub.text = sub;
+			_messageUntil = Time.time + seconds;
+		}
+
+		private void Update()
+		{
+			if (_message == null) return;
+			float left = _messageUntil - Time.time;
+			float a = Mathf.Clamp01(left * 3f);
+			_message.alpha = a;
+			_sub.alpha = a;
+		}
+
+		// Marker over the other glider, or an edge arrow when it's off this player's screen.
+		public void UpdateOther(Vector3 world, string label, bool active)
+		{
+			Place(world + Vector3.up * 5f, active, _otherGroup, _otherArrow, label, _otherLabel);
+		}
+
+		public void UpdateNext(Vector3 world, string label, bool active)
+		{
+			Place(world, active, _nextGroup, _nextArrow, label, _nextLabel);
+		}
+
+		private void Place(Vector3 world, bool active, RectTransform group, Image arrow, string label, TextMeshProUGUI text)
+		{
+			if (!active)
+			{
+				group.gameObject.SetActive(false);
+				arrow.gameObject.SetActive(false);
+				return;
+			}
+			Rect px = _cam.pixelRect;
+			Vector3 sp = _cam.WorldToScreenPoint(world);
+			bool behind = sp.z < 0f;
+			float margin = 40f;
+			bool inside = !behind && sp.x > px.xMin + margin && sp.x < px.xMax - margin && sp.y > px.yMin + margin && sp.y < px.yMax - margin;
+			group.gameObject.SetActive(inside);
+			arrow.gameObject.SetActive(!inside);
+			text.text = label;
+			Vector2 center = px.center;
+			Vector2 p = new Vector2(sp.x, sp.y);
+			if (behind)
+			{
+				p = center - (p - center);
+			}
+			if (inside)
+			{
+				RectTransformUtility.ScreenPointToLocalPointInRectangle(_root, p, null, out Vector2 local);
+				group.anchoredPosition = local;
+				return;
+			}
+			Vector2 dir = (p - center);
+			if (dir.sqrMagnitude < 1f) dir = Vector2.down;
+			Vector2 half = new Vector2(px.width * 0.5f - margin * 1.5f, px.height * 0.5f - margin * 1.5f);
+			float k = Mathf.Min(half.x / Mathf.Max(0.001f, Mathf.Abs(dir.x)), half.y / Mathf.Max(0.001f, Mathf.Abs(dir.y)));
+			Vector2 edge = center + dir * k;
+			RectTransformUtility.ScreenPointToLocalPointInRectangle(_root, edge, null, out Vector2 l2);
+			arrow.rectTransform.anchoredPosition = l2;
+			arrow.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - 90f);
+		}
+
+		// ---------------------------------------------------------------- building blocks
+
+		private static RectTransform New(string name, Transform parent)
+		{
+			var go = new GameObject(name, typeof(RectTransform));
+			go.transform.SetParent(parent, false);
+			var rt = (RectTransform)go.transform;
+			rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+			return rt;
+		}
+
+		private static RectTransform Panel(RectTransform parent, Vector2 anchor, Vector2 pos, Vector2 size)
+		{
+			RectTransform rt = New("Panel", parent);
+			rt.anchorMin = rt.anchorMax = anchor;
+			rt.pivot = anchor;
+			rt.anchoredPosition = pos;
+			rt.sizeDelta = size;
+			var img = rt.gameObject.AddComponent<Image>();
+			img.sprite = _pill;
+			img.type = Image.Type.Sliced;
+			img.color = new Color(0.02f, 0.03f, 0.05f, 0.55f);
+			return rt;
+		}
+
+		private static void Accent(RectTransform panel, Color c)
+		{
+			RectTransform a = New("Accent", panel);
+			a.anchorMin = new Vector2(0f, 0f);
+			a.anchorMax = new Vector2(0f, 1f);
+			a.pivot = new Vector2(0f, 0.5f);
+			a.sizeDelta = new Vector2(5f, -16f);
+			a.anchoredPosition = new Vector2(6f, 0f);
+			a.gameObject.AddComponent<Image>().color = c;
+		}
+
+		private static TextMeshProUGUI Text(RectTransform parent, string text, float size, Vector2 pos, TextAlignmentOptions align, Color color, FontStyles style)
+		{
+			RectTransform rt = New("Text", parent);
+			rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
+			rt.pivot = new Vector2(0f, 1f);
+			rt.anchoredPosition = pos;
+			rt.sizeDelta = new Vector2(600f, size * 1.3f);
+			var t = rt.gameObject.AddComponent<TextMeshProUGUI>();
+			t.text = text;
+			t.fontSize = size;
+			t.color = color;
+			t.alignment = align;
+			t.fontStyle = style;
+			t.textWrappingMode = TextWrappingModes.NoWrap;
+			t.raycastTarget = false;
+			return t;
+		}
+
+		private static void Center(RectTransform rt, Vector2 pos, Vector2 size)
+		{
+			rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+			rt.pivot = new Vector2(0.5f, 0.5f);
+			rt.anchoredPosition = pos;
+			rt.sizeDelta = size;
+		}
+
+		private static Image Icon(RectTransform parent, Sprite sprite, float size, Color c)
+		{
+			RectTransform rt = New("Icon", parent);
+			rt.sizeDelta = new Vector2(size, size);
+			var img = rt.gameObject.AddComponent<Image>();
+			img.sprite = sprite;
+			img.color = c;
+			img.raycastTarget = false;
+			return img;
+		}
+
+		private static void BuildSprites()
+		{
+			if (_circle != null) return;
+			_circle = MakeSprite(64, (x, y) => Mathf.Clamp01((0.5f - new Vector2(x - 0.5f, y - 0.5f).magnitude) * 64f));
+			_ring = MakeSprite(64, (x, y) => { float d = new Vector2(x - 0.5f, y - 0.5f).magnitude; return Mathf.Clamp01((0.06f - Mathf.Abs(d - 0.4f)) * 64f); });
+			_triangle = MakeSprite(64, (x, y) => { float w = (1f - y) * 0.5f; return Mathf.Clamp01((w - Mathf.Abs(x - 0.5f)) * 64f) * Mathf.Clamp01((y - 0.05f) * 64f) * Mathf.Clamp01((0.95f - y) * 64f); });
+			_diamond = MakeSprite(64, (x, y) => Mathf.Clamp01((0.45f - (Mathf.Abs(x - 0.5f) + Mathf.Abs(y - 0.5f))) * 64f));
+			_pill = MakeSprite(32, (x, y) =>
+			{
+				float r = 0.3f;
+				float dx = Mathf.Max(Mathf.Abs(x - 0.5f) - (0.5f - r), 0f), dy = Mathf.Max(Mathf.Abs(y - 0.5f) - (0.5f - r), 0f);
+				return Mathf.Clamp01((r - Mathf.Sqrt(dx * dx + dy * dy)) * 32f);
+			}, new Vector4(12, 12, 12, 12));
+		}
+
+		private static Sprite MakeSprite(int n, System.Func<float, float, float> alpha, Vector4 border = default)
+		{
+			var t = new Texture2D(n, n, TextureFormat.RGBA32, false);
+			var px = new Color[n * n];
+			for (int y = 0; y < n; y++) for (int x = 0; x < n; x++) px[y * n + x] = new Color(1f, 1f, 1f, alpha((x + 0.5f) / n, (y + 0.5f) / n));
+			t.SetPixels(px);
+			t.Apply();
+			t.wrapMode = TextureWrapMode.Clamp;
+			return Sprite.Create(t, new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, border);
+		}
+	}
+}

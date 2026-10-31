@@ -40,11 +40,17 @@ namespace GliderJam.EditorTools
 			var clouds = Get<VolumetricClouds>(profile);
 			P(clouds, "enable", true);
 			P(clouds, "cloudControl", "Simple");
-			// cloudPreset is a property that rewrites the shape parameters: scattered cumulus, then a low base.
+			// cloudPreset is a property that rewrites the shape parameters, so set it first; then a broken,
+			// warm-lit cumulus layer with its base just above the flight ceiling.
 			PropertyInfo preset = typeof(VolumetricClouds).GetProperty("cloudPreset");
-			preset.SetValue(clouds, Enum.Parse(preset.PropertyType, "Sparse"));
+			preset.SetValue(clouds, Enum.Parse(preset.PropertyType, "Custom"));
+			P(clouds, "densityMultiplier", 0.35f);
+			P(clouds, "shapeFactor", 0.9f);
+			P(clouds, "shapeScale", 2.4f);
+			P(clouds, "erosionFactor", 0.8f);
+			P(clouds, "erosionScale", 90f);
 			P(clouds, "bottomAltitude", 330f);
-			P(clouds, "altitudeRange", 1300f);
+			P(clouds, "altitudeRange", 1200f);
 			P(clouds, "shadows", true);
 			P(clouds, "shadowOpacity", 0.7f);
 			P(clouds, "shadowDistance", 6000f);
@@ -67,7 +73,7 @@ namespace GliderJam.EditorTools
 			P(exposure, "meteringMode", MeteringMode.CenterWeighted);
 			P(exposure, "limitMin", 10.5f);
 			P(exposure, "limitMax", 14.5f);
-			P(exposure, "compensation", 0.35f);
+			P(exposure, "compensation", 0.8f);
 			P(exposure, "adaptationSpeedDarkToLight", 2.5f);
 			P(exposure, "adaptationSpeedLightToDark", 1.5f);
 
@@ -211,6 +217,10 @@ namespace GliderJam.EditorTools
 			if (!profile.TryGet(out T c))
 			{
 				c = profile.Add<T>(false);
+				// Components must be sub-assets of the profile or they vanish on the next domain reload.
+				c.name = typeof(T).Name;
+				c.hideFlags = HideFlags.HideInInspector | HideFlags.HideInHierarchy;
+				AssetDatabase.AddObjectToAsset(c, profile);
 			}
 			c.active = true;
 			return c;
