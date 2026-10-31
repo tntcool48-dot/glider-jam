@@ -52269,9 +52269,9 @@ MonoBehaviour:
     blendingMode: 1
     priority: 0
     anisotropy: 0
-    volumeMask: {fileID: 0}
-    textureScrollingSpeed: {x: 0, y: 0, z: 0}
-    textureTiling: {x: 1, y: 1, z: 1}
+    volumeMask: {fileID: 11700000, guid: 11fe65d7f8e13a441ae486cb85a450ea, type: 2}
+    textureScrollingSpeed: {x: 0.012, y: 0.002, z: 0.007}
+    textureTiling: {x: 6, y: 1.5, z: 6}
     positiveFade: {x: 0.05, y: 0.75, z: 0.1}
     negativeFade: {x: 0.05, y: 0.05, z: 0.1}
     m_EditorUniformFade: 0.1
@@ -52283,7 +52283,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: 0, y: 0, z: 0}
+    textureOffset: {x: -0, y: -0, z: -0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}
@@ -52438,9 +52438,9 @@ MonoBehaviour:
     blendingMode: 1
     priority: 0
     anisotropy: 0
-    volumeMask: {fileID: 0}
-    textureScrollingSpeed: {x: 0, y: 0, z: 0}
-    textureTiling: {x: 1, y: 1, z: 1}
+    volumeMask: {fileID: 11700000, guid: 11fe65d7f8e13a441ae486cb85a450ea, type: 2}
+    textureScrollingSpeed: {x: 0.012, y: 0.002, z: 0.007}
+    textureTiling: {x: 6, y: 1.5, z: 6}
     positiveFade: {x: 0.05, y: 0.75, z: 0.1}
     negativeFade: {x: 0.05, y: 0.05, z: 0.1}
     m_EditorUniformFade: 0.1
@@ -52452,7 +52452,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: 0, y: 0, z: 0}
+    textureOffset: {x: -0, y: -0, z: -0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}
@@ -52507,9 +52507,9 @@ MonoBehaviour:
     blendingMode: 1
     priority: 0
     anisotropy: 0
-    volumeMask: {fileID: 0}
-    textureScrollingSpeed: {x: 0, y: 0, z: 0}
-    textureTiling: {x: 1, y: 1, z: 1}
+    volumeMask: {fileID: 11700000, guid: 11fe65d7f8e13a441ae486cb85a450ea, type: 2}
+    textureScrollingSpeed: {x: 0.012, y: 0.002, z: 0.007}
+    textureTiling: {x: 6, y: 1.5, z: 6}
     positiveFade: {x: 0.05, y: 0.75, z: 0.1}
     negativeFade: {x: 0.05, y: 0.05, z: 0.1}
     m_EditorUniformFade: 0.1
@@ -52521,7 +52521,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: 0, y: 0, z: 0}
+    textureOffset: {x: -0, y: -0, z: -0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}
@@ -53045,9 +53045,9 @@ MonoBehaviour:
     blendingMode: 1
     priority: 0
     anisotropy: 0
-    volumeMask: {fileID: 0}
-    textureScrollingSpeed: {x: 0, y: 0, z: 0}
-    textureTiling: {x: 1, y: 1, z: 1}
+    volumeMask: {fileID: 11700000, guid: 11fe65d7f8e13a441ae486cb85a450ea, type: 2}
+    textureScrollingSpeed: {x: 0.012, y: 0.002, z: 0.007}
+    textureTiling: {x: 6, y: 1.5, z: 6}
     positiveFade: {x: 0.05, y: 0.75, z: 0.1}
     negativeFade: {x: 0.05, y: 0.05, z: 0.1}
     m_EditorUniformFade: 0.1
@@ -53059,7 +53059,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: 0, y: 0, z: 0}
+    textureOffset: {x: -0, y: -0, z: -0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}
@@ -53114,9 +53114,9 @@ MonoBehaviour:
     blendingMode: 1
     priority: 0
     anisotropy: 0
-    volumeMask: {fileID: 0}
-    textureScrollingSpeed: {x: 0, y: 0, z: 0}
-    textureTiling: {x: 1, y: 1, z: 1}
+    volumeMask: {fileID: 11700000, guid: 11fe65d7f8e13a441ae486cb85a450ea, type: 2}
+    textureScrollingSpeed: {x: 0.012, y: 0.002, z: 0.007}
+    textureTiling: {x: 6, y: 1.5, z: 6}
     positiveFade: {x: 0.05, y: 0.75, z: 0.1}
     negativeFade: {x: 0.05, y: 0.05, z: 0.1}
     m_EditorUniformFade: 0.1
@@ -53128,7 +53128,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: 0, y: 0, z: 0}
+    textureOffset: {x: -0, y: -0, z: -0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}
@@ -53236,9 +53236,9 @@ MonoBehaviour:
     blendingMode: 1
     priority: 0
     anisotropy: 0
-    volumeMask: {fileID: 0}
-    textureScrollingSpeed: {x: 0, y: 0, z: 0}
-    textureTiling: {x: 1, y: 1, z: 1}
+    volumeMask: {fileID: 11700000, guid: 11fe65d7f8e13a441ae486cb85a450ea, type: 2}
+    textureScrollingSpeed: {x: 0.012, y: 0.002, z: 0.007}
+    textureTiling: {x: 6, y: 1.5, z: 6}
     positiveFade: {x: 0.05, y: 0.75, z: 0.1}
     negativeFade: {x: 0.05, y: 0.05, z: 0.1}
     m_EditorUniformFade: 0.1
@@ -53250,7 +53250,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: 0, y: 0, z: 0}
+    textureOffset: {x: -0, y: -0, z: -0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}
@@ -53287,6 +53287,7 @@ MonoBehaviour:
   lod0Distance: 320
   shadowDistance: 650
   cullDistance: 3500
+  density: 1
 --- !u!4 &1661866784
 Transform:
   m_ObjectHideFlags: 0
@@ -53294,6 +53295,68 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1661866782}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1762907035
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1762907037}
+  - component: {fileID: 1762907036}
+  m_Layer: 0
+  m_Name: Canyon Ambience
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1762907036
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1762907035}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f661bbd1d834c1144a8a28576f8448cd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GliderJam.World.CanyonAmbience
+  waterMaterial: {fileID: 2100000, guid: c8d07a1f22d291d4c8036732161ae232, type: 2}
+  birdMaterial: {fileID: 2100000, guid: 321db51a3ca801b4f80c20ebe3097ed0, type: 2}
+  dustMaterial: {fileID: 2100000, guid: b178299c778f69a4f93153793c8fd4f0, type: 2}
+  waterLevel: 2.5
+  waterArea:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 1000
+    height: 7000
+  flocks:
+  - {x: 386.34854, y: 186.77785, z: 842.4658}
+  - {x: 235.88329, y: 238, z: 1776.2847}
+  - {x: 459.8118, y: 238, z: 2551.8218}
+  - {x: 343.31848, y: 238, z: 3669.9766}
+  - {x: 925, y: 210.39282, z: 4455.0737}
+  - {x: 575, y: 189.24644, z: 5365.3467}
+  - {x: 704.43494, y: 238, z: 6376.967}
+--- !u!4 &1762907037
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1762907035}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -53625,9 +53688,9 @@ MonoBehaviour:
     blendingMode: 1
     priority: 0
     anisotropy: 0
-    volumeMask: {fileID: 0}
-    textureScrollingSpeed: {x: 0, y: 0, z: 0}
-    textureTiling: {x: 1, y: 1, z: 1}
+    volumeMask: {fileID: 11700000, guid: 11fe65d7f8e13a441ae486cb85a450ea, type: 2}
+    textureScrollingSpeed: {x: 0.012, y: 0.002, z: 0.007}
+    textureTiling: {x: 6, y: 1.5, z: 6}
     positiveFade: {x: 0.05, y: 0.75, z: 0.1}
     negativeFade: {x: 0.05, y: 0.05, z: 0.1}
     m_EditorUniformFade: 0.1
@@ -53639,7 +53702,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: 0, y: 0, z: 0}
+    textureOffset: {x: -0, y: -0, z: -0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}
@@ -53694,9 +53757,9 @@ MonoBehaviour:
     blendingMode: 1
     priority: 0
     anisotropy: 0
-    volumeMask: {fileID: 0}
-    textureScrollingSpeed: {x: 0, y: 0, z: 0}
-    textureTiling: {x: 1, y: 1, z: 1}
+    volumeMask: {fileID: 11700000, guid: 11fe65d7f8e13a441ae486cb85a450ea, type: 2}
+    textureScrollingSpeed: {x: 0.012, y: 0.002, z: 0.007}
+    textureTiling: {x: 6, y: 1.5, z: 6}
     positiveFade: {x: 0.05, y: 0.75, z: 0.1}
     negativeFade: {x: 0.05, y: 0.05, z: 0.1}
     m_EditorUniformFade: 0.1
@@ -53708,7 +53771,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: 0, y: 0, z: 0}
+    textureOffset: {x: -0, y: -0, z: -0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}
@@ -53726,3 +53789,4 @@ SceneRoots:
   - {fileID: 1068896187}
   - {fileID: 381821385}
   - {fileID: 1661866784}
+  - {fileID: 1762907037}

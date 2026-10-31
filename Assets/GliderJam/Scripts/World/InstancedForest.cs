@@ -97,6 +97,7 @@ namespace GliderJam.World
 					if (density < 1f && WorldNoise.Hash(n++, 17, 5) > density) continue;
 					Vector3 p = o + Vector3.Scale(ti.position, size);
 					p.y = o.y + t.SampleHeight(p);
+					if (p.y < CanyonAmbience.TreeLine) continue; // under the valley water
 					var m = Matrix4x4.TRS(p, Quaternion.Euler(0f, ti.rotation * Mathf.Rad2Deg, 0f), new Vector3(ti.widthScale, ti.heightScale, ti.widthScale));
 					var key = new Vector2Int(Mathf.FloorToInt(p.x / cellSize), Mathf.FloorToInt(p.z / cellSize));
 					if (!cells.TryGetValue(key, out Cell c))

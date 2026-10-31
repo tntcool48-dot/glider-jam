@@ -209,6 +209,7 @@ namespace GliderJam
 			foreach (InstancedForest f in FindObjectsByType<InstancedForest>(FindObjectsSortMode.None)) f.ApplyQuality(cfg.vegetation);
 			foreach (MeshTerrain t in FindObjectsByType<MeshTerrain>(FindObjectsSortMode.None)) t.ApplyQuality(cfg.backdrop, cfg.terrainDetail);
 			CityWeather.ApplyQuality(cfg);
+			CanyonAmbience.ApplyQuality(cfg);
 			foreach (WaterSurface w in FindObjectsByType<WaterSurface>(FindObjectsInactive.Include, FindObjectsSortMode.None)) w.enabled = cfg.water > 0;
 			foreach (LensFlareComponentSRP lf in FindObjectsByType<LensFlareComponentSRP>(FindObjectsSortMode.None)) lf.enabled = cfg.lensFlare;
 			foreach (LocalVolumetricFog lv in FindObjectsByType<LocalVolumetricFog>(FindObjectsInactive.Include, FindObjectsSortMode.None)) lv.enabled = cfg.fog > 0;

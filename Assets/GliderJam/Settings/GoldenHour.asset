@@ -297,22 +297,22 @@ MonoBehaviour:
     m_Value: 0.5
   densityMultiplier:
     m_OverrideState: 1
-    m_Value: 0.35
+    m_Value: 0.45
   shapeFactor:
     m_OverrideState: 1
-    m_Value: 0.9
+    m_Value: 0.82
   shapeScale:
     m_OverrideState: 1
-    m_Value: 2.4
+    m_Value: 3.2
   shapeOffset:
     m_OverrideState: 0
     m_Value: {x: 0, y: 0, z: 0}
   erosionFactor:
     m_OverrideState: 1
-    m_Value: 0.8
+    m_Value: 0.65
   erosionScale:
     m_OverrideState: 1
-    m_Value: 90
+    m_Value: 120
   erosionNoiseType:
     m_OverrideState: 0
     m_Value: 1
