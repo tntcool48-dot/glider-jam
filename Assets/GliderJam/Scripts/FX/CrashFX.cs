@@ -14,12 +14,15 @@ namespace GliderJam.FX
 			Object.Destroy(root, 14f);
 
 			SpawnDebris(fx, root.transform, visual, velocity);
-			Burst(root.transform, fx.fire, "Fireball", 34, new Vector2(7f, 17f), new Vector2(0.55f, 1.25f), new Vector2(6f, 30f), 3f,
+			// Initial flash, then the rolling fireball, afterburn, and smoke that only thickens once the fire has bloomed.
+			Burst(root.transform, fx.fire, "Flash", 3, new Vector2(30f, 45f), new Vector2(0.18f, 0.28f), new Vector2(0f, 2f), 0.5f,
+				FlashGradient(), 0f, ParticleSystemRenderMode.Billboard, 0f);
+			Burst(root.transform, fx.fire, "Fireball", 44, new Vector2(8f, 20f), new Vector2(0.7f, 1.5f), new Vector2(8f, 34f), 3f,
 				FireGradient(), 0f, ParticleSystemRenderMode.Billboard, 0f);
-			Burst(root.transform, fx.fire, "Afterburn", 14, new Vector2(4f, 9f), new Vector2(0.8f, 1.8f), new Vector2(2f, 10f), 4f,
-				FireGradient(), 0.25f, ParticleSystemRenderMode.Billboard, 0f);
+			Burst(root.transform, fx.fire, "Afterburn", 18, new Vector2(5f, 11f), new Vector2(0.9f, 2f), new Vector2(2f, 12f), 4f,
+				FireGradient(), 0.3f, ParticleSystemRenderMode.Billboard, -0.02f);
 			Burst(root.transform, fx.smoke, "Smoke", 26, new Vector2(12f, 26f), new Vector2(4f, 8f), new Vector2(3f, 14f), 5f,
-				SmokeGradient(), 0.1f, ParticleSystemRenderMode.Billboard, -0.06f);
+				SmokeGradient(), 0.35f, ParticleSystemRenderMode.Billboard, -0.06f);
 			Burst(root.transform, fx.spark, "Sparks", 90, new Vector2(0.25f, 0.6f), new Vector2(0.6f, 1.8f), new Vector2(25f, 75f), 1.5f,
 				SparkGradient(), 0f, ParticleSystemRenderMode.Stretch, 1.1f);
 
@@ -145,6 +148,14 @@ namespace GliderJam.FX
 			var g = new Gradient();
 			g.SetKeys(new[] { new GradientColorKey(new Color(1f, 0.95f, 0.8f), 0f), new GradientColorKey(new Color(1f, 0.62f, 0.18f), 0.22f), new GradientColorKey(new Color(0.85f, 0.22f, 0.05f), 0.55f), new GradientColorKey(new Color(0.15f, 0.08f, 0.05f), 1f) },
 				new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.06f), new GradientAlphaKey(0.85f, 0.5f), new GradientAlphaKey(0f, 1f) });
+			return g;
+		}
+
+		private static Gradient FlashGradient()
+		{
+			var g = new Gradient();
+			g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(1f, 0.7f, 0.35f), 1f) },
+				new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) });
 			return g;
 		}
 

@@ -10,6 +10,7 @@ namespace GliderJam.UI
 	{
 		protected override void Build()
 		{
+			GameSettings.Showcase = false;
 			int w = GameSettings.Winner;
 			bool solo = GameSettings.Mode == GameMode.Solo;
 			if (!GameSettings.HasResult)

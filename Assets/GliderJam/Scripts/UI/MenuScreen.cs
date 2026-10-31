@@ -11,6 +11,7 @@ namespace GliderJam.UI
 	{
 		public Texture2D background;
 		protected RectTransform Root;
+		protected RawImage BackgroundImage;
 		private Button _first;
 
 		protected virtual void Start()
@@ -32,6 +33,7 @@ namespace GliderJam.UI
 				var raw = bg.gameObject.AddComponent<RawImage>();
 				raw.texture = background;
 				raw.uvRect = FitCover(background);
+				BackgroundImage = raw;
 			}
 			// Left-side darkening gradient for legibility.
 			var shade = Full("Shade");

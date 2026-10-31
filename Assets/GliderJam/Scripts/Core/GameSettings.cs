@@ -13,6 +13,9 @@ namespace GliderJam
 	{
 		public static GameMode Mode = GameMode.SplitScreen;
 
+		// True while the race scene is loaded behind the main menu as a cinematic flyover.
+		public static bool Showcase;
+
 		public static readonly Color[] PlayerColors =
 		{
 			new Color(1f, 0.18f, 0.30f), // P1 signal red

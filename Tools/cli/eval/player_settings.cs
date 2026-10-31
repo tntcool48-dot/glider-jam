@@ -1,0 +1,11 @@
+UnityEditor.PlayerSettings.companyName = "YazanJaber";
+UnityEditor.PlayerSettings.productName = "Glider Jam";
+UnityEditor.PlayerSettings.fullScreenMode = UnityEngine.FullScreenMode.FullScreenWindow;
+UnityEditor.PlayerSettings.defaultScreenWidth = 1920;
+UnityEditor.PlayerSettings.defaultScreenHeight = 1080;
+UnityEditor.PlayerSettings.runInBackground = false;
+UnityEditor.PlayerSettings.SetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Standalone, UnityEditor.ScriptingImplementation.Mono2x);
+UnityEditor.AssetDatabase.SaveAssets();
+var scenes = new System.Collections.Generic.List<string>();
+foreach (var s in UnityEditor.EditorBuildSettings.scenes) scenes.Add(s.path + (s.enabled ? "" : "(off)"));
+return "player settings ok; quality=" + UnityEngine.QualitySettings.names[UnityEngine.QualitySettings.GetQualityLevel()] + " rp=" + UnityEngine.QualitySettings.renderPipeline + " vsync=" + UnityEngine.QualitySettings.vSyncCount + " scenes=" + string.Join(", ", scenes);

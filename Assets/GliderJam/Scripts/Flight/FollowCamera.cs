@@ -14,7 +14,7 @@ namespace GliderJam.Flight
 		public float followSharpness = 9f;
 		public float rotationSharpness = 7f;
 		public float baseFov = 60f;
-		public float boostFov = 80f;
+		public float boostFov = 74f;
 		public float bankLean = 0.35f;
 		public LayerMask collisionMask = ~0;
 

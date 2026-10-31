@@ -6,14 +6,29 @@ using UnityEngine.UI;
 
 namespace GliderJam.UI
 {
+	// Main menu over a live cinematic flyover: the race scene is loaded additively in showcase mode
+	// (autopilot gliders filmed by the ShowcaseDirector); the static hero image shows while it loads.
 	public class MainMenuScreen : MenuScreen
 	{
+		protected override void Start()
+		{
+			base.Start();
+			Camera menuCamera = Camera.main;
+			GameSettings.Showcase = true;
+			AsyncOperation op = SceneManager.LoadSceneAsync(GameSettings.RaceScene, LoadSceneMode.Additive);
+			op.completed += _ =>
+			{
+				if (BackgroundImage != null) BackgroundImage.enabled = false;
+				if (menuCamera != null) menuCamera.enabled = false;
+			};
+		}
+
 		protected override void Build()
 		{
 			Label("GLIDER JAM", 120f, new Vector2(120f, -150f), Color.white, FontStyles.Bold | FontStyles.Italic);
 			Label("GOLDEN PILLARS  /  SAILPLANE RACING", 30f, new Vector2(126f, -290f), new Color(1f, 0.82f, 0.55f));
-			MakeButton("SOLO RACE", new Vector2(120f, -420f), GameSettings.PlayerColors[0], () => Start(GameMode.Solo));
-			MakeButton("SPLIT-SCREEN  -  2 PLAYERS", new Vector2(120f, -520f), GameSettings.PlayerColors[1], () => Start(GameMode.SplitScreen));
+			MakeButton("SOLO RACE", new Vector2(120f, -420f), GameSettings.PlayerColors[0], () => Begin(GameMode.Solo));
+			MakeButton("SPLIT-SCREEN  -  2 PLAYERS", new Vector2(120f, -520f), GameSettings.PlayerColors[1], () => Begin(GameMode.SplitScreen));
 			MakeButton("QUIT", new Vector2(120f, -620f), new Color(0.5f, 0.55f, 0.6f), Quit);
 			Label("<color=#FF2E4D>PLAYER 1</color>   W/S pitch   A/D turn   SPACE boost   L-SHIFT brake", 24f, new Vector2(120f, -800f), new Color(1f, 1f, 1f, 0.85f), FontStyles.Normal, 1600f);
 			Label("<color=#1EC8FF>PLAYER 2</color>   UP/DOWN pitch   LEFT/RIGHT turn   R-CTRL boost   R-SHIFT brake", 24f, new Vector2(120f, -840f), new Color(1f, 1f, 1f, 0.85f), FontStyles.Normal, 1600f);
@@ -22,11 +37,18 @@ namespace GliderJam.UI
 			Label(best, 24f, new Vector2(120f, -950f), new Color(1f, 0.85f, 0.5f), FontStyles.Bold);
 		}
 
-		private static void Start(GameMode mode)
+		private static void Begin(GameMode mode)
 		{
+			AudioSynthClick();
 			GameSettings.Mode = mode;
 			GameSettings.HasResult = false;
+			GameSettings.Showcase = false;
 			Load(GameSettings.RaceScene);
+		}
+
+		private static void AudioSynthClick()
+		{
+			GliderJam.Audio.AudioSynth.Play(GliderJam.Audio.AudioSynth.Click, 0.6f);
 		}
 	}
 }

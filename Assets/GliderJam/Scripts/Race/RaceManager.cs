@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using GliderJam.Audio;
 using GliderJam.Flight;
 using GliderJam.FX;
 using GliderJam.UI;
@@ -27,7 +28,6 @@ namespace GliderJam.Race
 			public GliderVisuals visuals;
 			public FollowCamera cam;
 			public PlayerHUD hud;
-			public AudioSource wind;
 			public int nextCp;
 			public int pathHint;
 			public float progress;
@@ -46,12 +46,23 @@ namespace GliderJam.Race
 		private float _endAt = -1f;
 		private readonly List<Transform> _rings = new List<Transform>();
 
+		private bool _showcase;
+		private readonly List<GliderController> _showcaseGliders = new List<GliderController>();
+
+		// Layers 8 / 9 hold effects only one player's camera may see.
+		public static int ViewLayer(int player) => 8 + Mathf.Clamp(player, 0, 1);
+
 		public float RaceTime => _raceStart < 0f ? 0f : Time.time - _raceStart;
 		public bool Running => _raceStart >= 0f;
 
 		private void Start()
 		{
 			DisableLegacyObjects();
+			if (GameSettings.Showcase)
+			{
+				StartShowcase();
+				return;
+			}
 			int count = GameSettings.PlayerCount;
 			bool solo = count == 1;
 			var canvasGo = new GameObject("Race HUD", typeof(Canvas), typeof(UnityEngine.UI.CanvasScaler));
@@ -81,7 +92,7 @@ namespace GliderJam.Race
 				p.visuals.trailMaterial = fx.trail;
 				p.visuals.vaporMaterial = fx.vapor;
 				p.visuals.playerColor = GameSettings.PlayerColors[i];
-				if (i < autopilot.Length && autopilot[i])
+				if ((i < autopilot.Length && autopilot[i]) || Benchmark.Active)
 				{
 					var ap = go.AddComponent<AutopilotDriver>();
 					ap.route = route;
@@ -93,15 +104,13 @@ namespace GliderJam.Race
 					d.player = i;
 					d.solo = solo;
 				}
-				p.wind = go.AddComponent<AudioSource>();
-				p.wind.clip = fx.windClip;
-				p.wind.loop = true;
-				p.wind.spatialBlend = 0f;
-				p.wind.volume = 0f;
-				p.wind.Play();
+				var au = go.AddComponent<GliderAudio>();
+				au.windClip = fx.windClip;
+				au.masterVolume = solo ? 1f : 0.65f;
 
 				// Camera with its own viewport: P1 top, P2 bottom.
 				var camGo = new GameObject("Camera P" + (i + 1));
+				camGo.layer = ViewLayer(i);
 				var cam = camGo.AddComponent<Camera>();
 				cam.nearClipPlane = 0.5f;
 				cam.farClipPlane = 20000f;
@@ -109,11 +118,15 @@ namespace GliderJam.Race
 				hd.antialiasing = HDAdditionalCameraData.AntialiasingMode.TemporalAntialiasing;
 				Rect vp = solo ? new Rect(0f, 0f, 1f, 1f) : (i == 0 ? new Rect(0f, 0.5f, 1f, 0.5f) : new Rect(0f, 0f, 1f, 0.5f));
 				cam.rect = vp;
+				cam.cullingMask = ~(1 << ViewLayer(1 - i)); // never see the other player's private view effects
 				if (i == 0) camGo.AddComponent<AudioListener>();
 				p.cam = camGo.AddComponent<FollowCamera>();
 				p.cam.target = p.glider;
 				p.cam.Snap();
 				cams.Add(p.cam);
+				var streaks = camGo.AddComponent<SpeedStreaks>();
+				streaks.glider = p.glider;
+				streaks.material = fx.spark;
 
 				p.hud = new GameObject("HUD P" + (i + 1)).AddComponent<PlayerHUD>();
 				p.hud.Init(canvas, cam, i, count, vp);
@@ -137,6 +150,11 @@ namespace GliderJam.Race
 
 		private void Update()
 		{
+			if (_showcase)
+			{
+				UpdateShowcase();
+				return;
+			}
 			// Countdown
 			if (_raceStart < 0f)
 			{
@@ -145,6 +163,7 @@ namespace GliderJam.Race
 				{
 					_lastCountdown = n;
 					foreach (Player p in _players) p.hud.ShowMessage(n.ToString(), "", Color.white, 0.9f);
+					AudioSynth.Play(AudioSynth.Beep, 0.7f);
 				}
 				if (Time.time >= _countdownEnd)
 				{
@@ -154,6 +173,7 @@ namespace GliderJam.Race
 						p.glider.Frozen = false;
 						p.hud.ShowMessage("GO!", "", new Color(1f, 0.85f, 0.4f), 1.1f);
 					}
+					AudioSynth.Play(AudioSynth.Go, 0.8f);
 				}
 			}
 
@@ -177,8 +197,6 @@ namespace GliderJam.Race
 				float along = Vector3.Dot(pos - route.path[h], tangent.normalized) / Mathf.Max(1f, tangent.magnitude);
 				p.progress = p.finished ? 1e6f - p.finishTime : p.nextCp * 10000f + h + along;
 				float speed = p.glider.Crashed ? 0f : p.glider.Speed;
-				p.wind.volume = Mathf.Lerp(0.15f, 0.55f, p.glider.SpeedNormalized) * (p.glider.Crashed ? 0f : 1f) / _players.Count;
-				p.wind.pitch = Mathf.Lerp(0.8f, 1.25f, p.glider.SpeedNormalized);
 				float time = p.finished ? p.finishTime : RaceTime + p.missed * missedPenalty;
 				p.hud.SetStats(Rank(i), Mathf.Min(p.nextCp, route.CheckpointCount), route.CheckpointCount, time, speed, p.glider.BoostEnergy);
 
@@ -251,14 +269,17 @@ namespace GliderJam.Race
 			{
 				p.missed++;
 				p.hud.ShowMessage("MISSED", "+" + missedPenalty.ToString("0") + " s penalty", new Color(1f, 0.45f, 0.35f), 1.2f);
+				AudioSynth.Play(AudioSynth.Beep, 0.5f, 0.6f);
 			}
 			else if (!finish)
 			{
 				p.hud.ShowMessage("", "CHECKPOINT " + p.nextCp + "/" + route.CheckpointCount, new Color(1f, 0.9f, 0.7f), 1f);
+				AudioSynth.Play(AudioSynth.Chime, 0.55f, i == 0 ? 1f : 1.12f);
 			}
 			if (!finish) return;
 
 			p.finished = true;
+			AudioSynth.Play(AudioSynth.Go, 0.9f, 0.8f);
 			p.finishTime = RaceTime + p.missed * missedPenalty;
 			if (_winner < 0)
 			{
@@ -322,6 +343,57 @@ namespace GliderJam.Race
 				GameSettings.MissedCheckpoints[i] = has ? _players[i].missed : 0;
 			}
 			SceneManager.LoadScene(GameSettings.EndScene);
+		}
+
+		// ---------------------------------------------------------------- menu showcase
+
+		private void StartShowcase()
+		{
+			_showcase = true;
+			Vector3 start = route.path[0];
+			Vector3 fwd = Vector3.ProjectOnPlane(route.path[3] - route.path[0], Vector3.up).normalized;
+			Vector3 right = Vector3.Cross(Vector3.up, fwd).normalized;
+			for (int i = 0; i < 2; i++)
+			{
+				GameObject go = Instantiate(fx.gliderPrefabs[i], start + right * (i == 0 ? -12f : 12f) - fwd * i * 30f, Quaternion.LookRotation(fwd));
+				var g = go.AddComponent<GliderController>();
+				g.PlayerIndex = i;
+				g.ceiling = route.ceiling;
+				var v = go.AddComponent<GliderVisuals>();
+				v.trailMaterial = fx.trail;
+				v.vaporMaterial = fx.vapor;
+				v.playerColor = GameSettings.PlayerColors[i];
+				var ap = go.AddComponent<AutopilotDriver>();
+				ap.route = route;
+				ap.lateralOffset = i == 0 ? -10f : 10f;
+				g.OnCrash += (glider, point, vel) => glider.Respawn(route.path[Mathf.Max(0, route.ClosestIndex(point, 0, route.path.Length) - 3)], Quaternion.LookRotation(Vector3.ProjectOnPlane(fwd, Vector3.up)), 1f);
+				_showcaseGliders.Add(g);
+			}
+			var camGo = new GameObject("Showcase Camera");
+			var cam = camGo.AddComponent<Camera>();
+			cam.nearClipPlane = 0.5f;
+			cam.farClipPlane = 20000f;
+			cam.depth = 5f;
+			camGo.AddComponent<HDAdditionalCameraData>().antialiasing = HDAdditionalCameraData.AntialiasingMode.TemporalAntialiasing;
+			var dir = camGo.AddComponent<ShowcaseDirector>();
+			dir.subjects = _showcaseGliders.ToArray();
+			dir.route = route;
+			BuildRings();
+		}
+
+		private void UpdateShowcase()
+		{
+			foreach (GliderController g in _showcaseGliders)
+			{
+				// Loop the flyover: back to the start after the finish.
+				if (!g.Crashed && (g.transform.position - route.path[route.path.Length - 1]).sqrMagnitude < 120f * 120f)
+				{
+					Vector3 fwd = Vector3.ProjectOnPlane(route.path[3] - route.path[0], Vector3.up).normalized;
+					g.Respawn(route.path[0], Quaternion.LookRotation(fwd), 0.5f);
+					g.GetComponent<GliderVisuals>().ClearTrails();
+				}
+			}
+			UpdateRings();
 		}
 
 		// ---------------------------------------------------------------- rings

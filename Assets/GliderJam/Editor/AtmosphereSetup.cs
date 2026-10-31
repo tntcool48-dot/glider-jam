@@ -151,8 +151,20 @@ namespace GliderJam.EditorTools
 				hd.volumetricDimmer = 1.2f;
 			}
 
+			// Realistic 50 mm lens flare on the sun, occluded by terrain and clouds.
+			var flareData = AssetDatabase.LoadAssetAtPath<LensFlareDataSRP>("Assets/Samples/High Definition Render Pipeline/17.3.0/Lens Flare Samples/Lens Flares/50mm.asset")
+				?? AssetDatabase.LoadAssetAtPath<LensFlareDataSRP>(AssetDatabase.GUIDToAssetPath(AssetDatabase.FindAssets("50mm t:LensFlareDataSRP")[0]));
+			var flare = sun.GetComponent<LensFlareComponentSRP>();
+			if (flare == null) flare = sun.AddComponent<LensFlareComponentSRP>();
+			flare.lensFlareData = flareData;
+			flare.intensity = 0.55f;
+			flare.useOcclusion = true;
+			flare.environmentOcclusion = true;
+			flare.allowOffScreen = false;
+
 			BuildMist();
 			ConfigurePipelineAsset();
+			ConfigureLayers();
 			UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(sun.scene);
 			return "profile ok" + (Missing.Count > 0 ? "; missing: " + string.Join(", ", Missing) : "");
 		}
@@ -199,6 +211,16 @@ namespace GliderJam.EditorTools
 				Set(so, "m_RenderPipelineSettings.supportMotionVectors", true);
 				so.ApplyModifiedPropertiesWithoutUndo();
 			}
+		}
+
+		// User layers 8 / 9: effects only player 1's / player 2's split-screen camera may see.
+		private static void ConfigureLayers()
+		{
+			var tags = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TagManager.asset")[0]);
+			SerializedProperty layers = tags.FindProperty("layers");
+			layers.GetArrayElementAtIndex(8).stringValue = "P1View";
+			layers.GetArrayElementAtIndex(9).stringValue = "P2View";
+			tags.ApplyModifiedPropertiesWithoutUndo();
 		}
 
 		private static void Set(SerializedObject so, string path, bool v)
