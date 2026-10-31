@@ -1,4 +1,4 @@
-# Glider Jam: report for the "go a little crazy" round
+# Glider Jam: report for the "go a little crazy" round and the city / canyon polish pass
 
 Everything lives on F: (project `F:\glider_jam\GliderJam`, player build `F:\glider_jam\Build\GliderJam.exe`,
 benchmark logs `F:\glider_jam\Build\Benchmarks`). Unity 6000.3.18f1, HDRP 17.3, D3D12, tested on an
@@ -10,21 +10,22 @@ RX 7900 XT / Ryzen 7 9700X.
 |---|---|---|
 | Settings for everything, volume to graphics | Done: Graphics / Display / Audio / Controls tabs, live apply, saved to `Build\Settings\settings.json` (Editor: `UserSettings/GliderJamSettings.json`) | `Scripts/Core/GameConfig.cs`, `QualityManager.cs`, `UI/SettingsPanel.cs` |
 | Presets Low / Medium / High (+ more) | Done: Low, Medium, High (default), Ultra, Ultra + Ray Tracing; touching any graphics row switches to Custom | `GameConfig.ApplyPreset` |
-| Ray tracing | Done, own HDRP asset "Ultra RT". The Ultra + Ray Tracing preset now ray traces reflections only (see "Ray tracing" below); ray traced AO and GI stay selectable under Custom | `Settings/HDRP Ultra RT.asset`, `QualityManager` |
+| Ray tracing | Done, own HDRP asset "Ultra RT". Ultra + Ray Tracing ray traces reflections, GI and AO in the city; the canyon keeps ray traced reflections only, and none in split-screen (see "Ray tracing") | `Settings/HDRP Ultra RT.asset`, `QualityManager` |
 | Two modes, solo and split | Main menu: SOLO RACE, SPLIT-SCREEN, MAP choice | `UI/MainMenuScreen.cs` |
 | Your control scheme (W/S pitch, A/D turn with roll to a 90 degree cap; arrows mirror for P2) | Done, constant speed. Boost / brake: P1 Space / Left Shift, P2 Right Shift / Right Ctrl (next to the arrows); each player's keys show under the race countdown; all rebindable | `Flight/GliderController.cs`, `GliderInput.cs`, `GameConfig.DefaultPlayers` |
 | Rebindable keys, invert pitch, FOV per player, controllers | Done: rebinding with swap on conflict, per-player invert / FOV / vibration; pad 1 = P1, pad 2 = P2 (solo: any pad); left stick fly, RT boost, LT brake, Start pause; rumble on crashes, boost, the finish and warnings | `GliderInput.cs`, `SettingsPanel.cs` |
 | Ceiling: don't raise it, explode after 1-2 s above it | Done: 2 s countdown with red vignette, "PULL DOWN", alarm and rumble, then the glider breaks up | `GliderController`, `PlayerHUD`, `RaceManager` |
 | No map, no checkpoints: a straight race, everyone finds their own way, warn when going the wrong way | Done, see "Free-route racing" | `Race/RaceManager.cs`, `RaceRoute.cs` |
 | Night city with neon, wet streets, rain; then cyberpunk buildings with reflections | Done, see "Neon City" | `Editor/CityBuilder.cs`, `Scenes/City.unity`, `World/CityWeather.cs` |
+| City: more reflective, higher-quality buildings, windows, mirror skyscrapers, ray tracing that shows off | Done: mirror-glass towers (silver-blue and bronze) are now the most common skyscraper, round glass towers, chrome fins and spires, polished stone plazas, wetter streets, lit windows with interiors; ray tracing tuned so reflections keep the neon colour (see "Neon City" and "Ray tracing") | `Editor/CityBuilder.cs`, `QualityManager`, `Editor/QualitySetup.cs` |
 | Make both maps harder (city was a straight line) | Done: city maze under a lower ceiling, extra spires and fins in the canyon | `CityBuilder`, `Editor/CanyonSetup.cs` |
 | Bug: the glider clips into terrain and only dies on the way out | Fixed (see "Crash fix") | `Flight/GliderController.cs` |
 | Glider: wing flex, vapor at high G, canopy reflections, panel lines (no decals, no instruments) | Done | `Flight/WingFlex.cs`, `GliderVisuals.cs`, `Editor/GliderBuilder.cs` |
 | Free music | 3 tracks by Kevin MacLeod (CC BY 4.0), cross-faded: menu, canyon, city | `Audio/`, `MUSIC_CREDITS.md` |
-| Great-looking UI | UI kit (Rajdhani font, rounded panels, accent bars), settings screen, pause menu, warnings, finish marker, map name on the results | `Scripts/UI/` |
+| Great-looking UI | UI kit (Rajdhani font, rounded panels, accent bars), settings screen, pause menu, warnings, finish marker, map name on the results; the results screen shows the city after a city race (a ray traced render of the game) | `Scripts/UI/`, `Resources/CityBackground.png` |
 | FPS counter, top left | Settings > Display > FPS COUNTER: frame rate and frame time, green 60+ / yellow 30+ / red below, in menus and races | `UI/FpsCounter.cs` |
 | Outer terrain: keep it, optimize, measure | Kept. No shadows, no colliders, one LOD in the ray tracing scene; "Distant landscape" setting (Off / Low / High). Costs nothing measurable (below) | `World/MeshTerrain.cs` |
-| Make the canyon look better | Done: river over the valley floor, seven waterfalls, circling bird flocks, sunlit dust motes, drifting 3D-noise mist, sharper cumulus, 42 extra spires / fins. Not done: vines, denser pillar-top forest, second rock texture | `World/CanyonAmbience.cs`, `Editor/CanyonSetup.cs` |
+| Make the canyon look better | Done: river over the valley floor, seven waterfalls, circling bird flocks, sunlit dust motes, drifting 3D-noise mist, 42 extra spires / fins; then ivy curtains on the cliffs, a denser forest on the high ground, a second (darker) rock in bands, and separate cumulus clouds instead of a flat overcast | `World/CanyonAmbience.cs`, `Editor/CanyonSetup.cs`, `Editor/TerrainArtSetup.cs` |
 
 ## Free-route racing
 
@@ -42,8 +43,14 @@ RX 7900 XT / Ryzen 7 9700X.
 
 - 11 x 26 block downtown: towers with podiums and setbacks, a third of the glass towers chamfered (octagonal),
   floor ledges on hab blocks, vertical fins on curtain walls, glowing glass spires, roof furniture and antennas.
-- Facades: mirror glass (light metallic, 97% smooth) that reflects the neon and the city glow, LED light bands
-  every 5-8 floors (cyan / magenta), dense hab blocks with coloured windows and grime, normal maps on all of them.
+- Mirror skyscrapers (the most common tall tower now): silver-blue and bronze mirror glass, fully metallic and
+  98.5% smooth, on a fine mullion grid. Each pane is tilted a little in the normal map, so reflections ripple from
+  pane to pane like real curtain walls instead of one flat mirror; faint offices and a light band every 10-12
+  floors show through the glass.
+- Round glass towers (faceted, with capsule colliders), octagonal towers, chrome fins and chrome spires, polished
+  stone (veined slabs) on plazas, podium tops and sidewalks, wetter asphalt with bigger puddles.
+- Other facades: tinted glass with LED bands every 5-8 floors (cyan / magenta), offices and dense hab blocks;
+  lit windows now have a ceiling light and furniture silhouettes; normal maps on all of them.
 - Neon blade signs (some flicker), rooftop outlines, rings, podium bands, corner strips, 40 holograms incl. tall
   scrolling glyph banners, about 170 point lights.
 - Street traffic (tail lights going your way, headlights coming at you) and six lanes of air cars crossing between
@@ -56,6 +63,20 @@ RX 7900 XT / Ryzen 7 9700X.
   U-turn, which the wrong-way rule would undo). The race line stays open and is checked for clearance.
 - Regenerate with `Tools/cli/eval/build_city.cs` (about 45 s).
 
+## Canyon
+
+- Ivy: 1,135 curtains (about 12,000 strands) hanging from cliff lips along the corridor. Each curtain faces down the
+  slope and each strand is re-fitted to the wall every 2.5 m, so it drapes over the rock instead of sticking out or
+  sinking in. Generated leaf texture, alpha cut, double-sided, no shadows, not in the ray tracing scene; hidden when
+  Vegetation is at its lowest setting.
+- Forest: 7,077 more trees in clumps on flat high ground (above 110 m), the same tree types as before, so they
+  collide like the rest. Re-running the canyon setup replaces them rather than adding more.
+- Rock: a second, darker rock (Poly Haven "dark_rock") in strata bands on the cliffs, pillars and spires, mixed
+  with the sandstone, rubble and moss layers.
+- Clouds: the cloud base sat at 330 m, just above the 288 m ceiling, and from the canyon floor it read as one flat
+  purple overcast. The base is now at 800 m with more shape and erosion: separate cumulus with sky between them.
+- Regenerate with `Tools/cli/eval/canyon_setup.cs` (about a minute).
+
 ## Crash fix
 
 At 110-145 m/s the glider moves 2-3 m per physics step, and Unity's terrain (heightfield) collider can let a fast
@@ -66,15 +87,21 @@ shallow dive into a slope, vertical dive: all stop at the surface. Crash debris 
 
 ## Ray tracing
 
-- Your observation matches the numbers: most of the scene is lit by the sun and sky, which look the same either
-  way; ray tracing mainly sharpens reflections (river, wet streets, glass, canopy).
-- On the canyon, ray traced GI / AO were very heavy: every pixel shoots rays that hit the terrain's four-layer
-  material. Split-screen with all three ray traced effects fell to single digits, and twice the AMD driver failed to
-  build the ray tracing pipeline (out of memory, `0x8007000E`). The city, with simpler materials, was fine.
-- So Ultra + Ray Tracing now ray traces reflections only; terrain chunks put one LOD each into the ray tracing scene.
-- Even reflections only were too much for the canyon in split-screen (4.6 fps), so that one combination falls back
-  to screen-space effects automatically; solo races, the city and the menu flyover keep ray tracing.
-  Ultra without ray tracing is the recommended top setting.
+- Most of the canyon is lit by the sun and sky, which look the same either way, so ray tracing showed little
+  there. The city is where it pays off: mirror towers reflect each other, the neon and the wet streets, including
+  what's off screen, which screen-space reflections can't do.
+- Per map:
+  - City: ray traced reflections, GI and AO.
+  - Canyon: ray traced reflections only. Ray traced GI / AO on the four-layer terrain material were very heavy
+    (single digits in split-screen, and twice the AMD driver failed to build the ray tracing pipeline: out of
+    memory, `0x8007000E`). Terrain chunks put one LOD each into the ray tracing scene.
+  - Canyon in split-screen: falls back to screen-space effects automatically (reflections alone ran at 4.6 fps).
+- Reflection tuning, chosen from side-by-side renders of the same city views:
+  - Performance mode, full resolution, 1 bounce, rays up to 2 km, down to wet-asphalt smoothness (0.45).
+    Quality mode looked darker and noisier for the same cost.
+  - The firefly clamp is raised from 1 to 10: at 1, reflected neon came out grey. At 30, a chrome bridge underside
+    over neon flared into an orange hot spot, so the underside is plain metal now.
+- Ultra without ray tracing is still the recommended top setting for split-screen.
 
 ## Benchmarks (1920x1080 fullscreen, autopilot race, vsync off)
 
@@ -98,7 +125,7 @@ Full matrix, before the ray tracing change and the harder maps (`Build\Benchmark
 Distant landscape A/B (canyon, split, High), two runs each: High 147.5 / 147.2 fps, Off 144.7 / 149.3 fps,
 GPU 5.58 / 5.52 ms vs 5.54 / 5.33 ms: within noise. After the optimization the outer terrain costs nothing measurable.
 
-Final build (harder maps, Ultra RT = ray traced reflections only):
+Harder maps, Ultra RT = ray traced reflections only (before the mirror-glass city):
 
 | run | avg fps | 1% low | GPU ms | CPU ms | frames < 60 fps |
 |---|---|---|---|---|---|
@@ -108,16 +135,41 @@ Final build (harder maps, Ultra RT = ray traced reflections only):
 | city split Ultra RT (RT reflections) | 74.2 | 34.6 | 12.67 | 7.67 | 12.8% |
 | canyon solo Ultra RT (RT reflections) | 58.8 | 11.9 | 11.36 | 10.63 | 35.7% |
 
-Split-screen 1080p holds 60 fps on High (and Ultra) on both maps. With ray tracing, only the city in solo stays
-reliably above 60; the canyon solo run hitches while the ray tracing scene warms up (an 0.8 s stall in the first
-seconds) and stays borderline.
+Latest build (mirror-glass city with all ray traced effects in Ultra RT; canyon with ivy, extra trees, dark rock
+and the new clouds). Logs `Build\Benchmarks\v4_*` and `v5_*`:
+
+| run | avg fps | 1% low | GPU ms | CPU ms | frames < 60 fps |
+|---|---|---|---|---|---|
+| canyon split Low | 304.9 | 48.5 | 2.39 | 2.74 | 0.6% |
+| canyon split Medium | 176.7 | 60.8 | 4.35 | 5.38 | 0.3% |
+| canyon split High | 133.4 | 31.9 | 6.09 | 6.71 | 0.7% |
+| canyon split Ultra | 85.5 | 77.4 | 11.60 | 7.67 | 0.0% |
+| canyon split Ultra RT (automatic screen-space fallback) | 85.3 | 77.5 | 11.59 | 7.77 | 0.0% |
+| canyon solo Ultra | 107.9 | 96.6 | 9.18 | 4.41 | 0.0% |
+| canyon solo Ultra RT (RT reflections) | 62.8 | 13.3 | 11.46 | 10.68 | 30.1% |
+| city split High | 157.0 | 55.5 | 5.84 | 4.12 | 0.2% |
+| city split Ultra | 89.3 | 38.9 | 11.12 | 4.40 | 9.0% |
+| city split Ultra RT (all RT effects) | 64.3 | 32.7 | 15.15 | 7.97 | 17.4% |
+| city solo Ultra | 123.7 | 84.0 | 8.00 | 2.47 | 0.0% |
+| city solo Ultra RT (all RT effects) | 86.2 | 61.3 | 11.48 | 4.33 | 0.1% |
+
+- The canyon additions cost 3-5% (split High 139.5 -> 133.4, split Ultra 90.3 -> 85.5).
+- Split-screen 1080p holds 60 fps on High on both maps, which is the default. On Ultra both maps average 85+, but the
+  city has dips (9% of frames under 60, mostly in the densest blocks).
+- Ray tracing: the city in solo is the showcase and stays above 60 (86 fps with all three ray traced effects).
+  City split-screen with ray tracing averages 64 with dips. The canyon solo run averages 63 but stalls while the ray
+  tracing scene warms up in the first seconds (1% low 13).
 
 ## Downloads (this round)
 
 - Music: Kevin MacLeod / incompetech.com, "Floating Cities", "Volatile Reaction", "Cyborg Ninja" (MP3, about 16 MB,
   CC BY 4.0, credited in the main menu and `MUSIC_CREDITS.md`).
 - Font: Rajdhani Bold / SemiBold (SIL Open Font License, `Art/UI/Fonts/OFL.txt`).
-- Everything else (city textures, glider panels, bird sheet, mist noise, rain, spires) is generated by code.
+- Rock textures from Poly Haven (CC0), 2K sets in `F:\glider_jam\_downloads\polyhaven`:
+  - "dark_rock" (10.7 MB): used as the second rock.
+  - "rock_face_03" (13.7 MB) and "rock_wall_08" (diffuse only, about 2.9 MB): tried and dropped. The first was
+    too brown next to the sandstone, the second looked like brickwork.
+- Everything else (city textures, glider panels, bird sheet, mist noise, rain, spires, ivy) is generated by code.
 
 ## C: drive
 
@@ -141,9 +193,15 @@ What didn't / workarounds
   fine): this hid the new wing UVs until meshes were copied through the Mesh API.
 - `FindObjectsByType` skips objects with `HideFlags.DontSave` (the generated terrain chunks), so census evals
   can't see them.
-- The player occasionally hangs right after loading the canyon (2 of ~35 benchmark launches, no error in the log);
-  `bench.ps1` now kills and retries such a run.
+- The player occasionally hangs right after loading the canyon (see "Not done"); `bench.ps1` kills and retries
+  such a run and keeps the hung run's log.
 - Editor screenshots exaggerate motion blur (low, uneven Editor frame rate); judge blur in the build.
+- `capture game_view --save_path` is relative to `Assets/` and rejects `..`, so saved captures land inside the
+  project (an `Assets/Screenshots` folder that then has to be moved out and deleted).
+- Right after `recompile` the Editor reloads scripts and the next command can fail with "No Pipeline instance
+  found"; `unity status --until-ready` before continuing avoids it.
+- In an eval, `VolumeManager.instance.stack` shows HDRP's default values, not what a camera renders with, which
+  briefly made the canyon clouds look switched off. Comparing renders with a setting on and off was reliable.
 
 Ideas for the CLI
 - A `capture camera` that renders a given position / rotation without writing a C# snippet.
@@ -152,7 +210,12 @@ Ideas for the CLI
 
 ## Not done / known issues
 
-- Canyon: vines, a denser pillar-top forest and a second rock texture.
-- The rare hang right after loading the canyon in the player (see above) is not diagnosed yet.
-- The results screen always flies over the canyon, also after a city race.
-- The editor logs one harmless TMP message during builds (fallback atlas of the default TMP font).
+- The rare hang right after the canyon loads in the player is not fixed. The terrain meshes now build on their own
+  threads instead of .NET's thread pool, and each load logs its timing. Since then there was 1 hang in 20 canyon
+  launches (8 benchmark runs plus 12 quick launches), against 2 in about 35 before. The hung run's log was
+  overwritten by the retry; `bench.ps1` now keeps it (`<run>.hang1.log`) for the next time it happens.
+- "A physically bigger canyon" was left as is: the free-route course is already 1 km wide and 7 km long, and the
+  new spires, ivy and trees fill it. Making it bigger means regenerating the terrain and the race line.
+- City split-screen on Ultra / Ultra RT dips under 60 in the densest blocks (see Benchmarks); High is smooth.
+- Builds log one harmless TMP error: the dynamic UI font's glyph cache is cleared for the build
+  (`MissingReferenceException ... m_AtlasTextures`); text renders normally in the player.

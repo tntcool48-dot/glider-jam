@@ -19,8 +19,8 @@ Material:
   - _HEIGHT_BASED_BLEND
   - _LAYEREDLIT_4_LAYERS
   - _LAYER_MAPPING_PLANAR1
-  - _LAYER_MAPPING_PLANAR2
   - _LAYER_MAPPING_TRIPLANAR0
+  - _LAYER_MAPPING_TRIPLANAR2
   - _LAYER_MAPPING_TRIPLANAR3
   - _LAYER_MASK_VERTEX_COLOR_MUL
   - _MASKMAP0
@@ -57,7 +57,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BaseColorMap2:
-        m_Texture: {fileID: 2800000, guid: 8117b1ee803b8864494f61d32feff1f8, type: 3}
+        m_Texture: {fileID: 2800000, guid: 9715ba50d8a30524fb996bc5f0983eef, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BaseColorMap3:
@@ -125,7 +125,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _HeightMap2:
-        m_Texture: {fileID: 2800000, guid: a82bb84ed164d094ca34a4b221834eb7, type: 3}
+        m_Texture: {fileID: 2800000, guid: 9bddaff931e48124ba2085da8a5a7b4a, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _HeightMap3:
@@ -153,7 +153,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MaskMap2:
-        m_Texture: {fileID: 2800000, guid: 02369294b37cfc24d99f55ef2b262371, type: 3}
+        m_Texture: {fileID: 2800000, guid: b9cc32521bf228d42a12fbe701c74d6f, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MaskMap3:
@@ -169,7 +169,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _NormalMap2:
-        m_Texture: {fileID: 2800000, guid: f6f3ff5c929628040a1da0af4af8b114, type: 3}
+        m_Texture: {fileID: 2800000, guid: 6e864a62157aa7f448bf54d8f01ce3d6, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _NormalMap3:
@@ -446,7 +446,7 @@ Material:
     - _SurfaceType: 0
     - _TexWorldScale0: 0.03448276
     - _TexWorldScale1: 0.029411765
-    - _TexWorldScale2: 0.041666668
+    - _TexWorldScale2: 0.03846154
     - _TexWorldScale3: 0.06666667
     - _TexWorldScaleBlendMask: 1
     - _TexWorldScaleEmissive: 1
@@ -465,7 +465,7 @@ Material:
     - _TransparentZWrite: 0
     - _UVBase0: 5
     - _UVBase1: 4
-    - _UVBase2: 4
+    - _UVBase2: 5
     - _UVBase3: 5
     - _UVBlendMask: 0
     - _UVDetail0: 0
@@ -486,7 +486,7 @@ Material:
     m_Colors:
     - _BaseColor0: {r: 0.82, g: 0.74, b: 0.7, a: 1}
     - _BaseColor1: {r: 0.9, g: 1, b: 0.86, a: 1}
-    - _BaseColor2: {r: 0.95, g: 0.95, b: 0.95, a: 1}
+    - _BaseColor2: {r: 1, g: 0.97, b: 0.94, a: 1}
     - _BaseColor3: {r: 0.85, g: 0.95, b: 0.85, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DiffusionProfileAsset0: {r: 0, g: 0, b: 0, a: 0}

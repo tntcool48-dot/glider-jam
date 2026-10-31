@@ -14,6 +14,7 @@ namespace GliderJam.World
 		public Material birdMaterial;
 		public Material dustMaterial;
 		public Material waterfallMaterial;
+		public GameObject vines;
 		public Vector4[] waterfalls = new Vector4[0]; // top edge (xyz) and the yaw (degrees) it falls towards
 		public float waterLevel = 2.5f;
 		public Rect waterArea = new Rect(0f, 0f, 1000f, 7000f);
@@ -147,6 +148,7 @@ namespace GliderJam.World
 			_birdsOn = cfg.effects > 0;
 			foreach (ParticleSystem b in _birds) b.gameObject.SetActive(_birdsOn);
 			foreach (GameObject f in _falls) f.SetActive(cfg.effects > 0);
+			if (vines != null) vines.SetActive(cfg.vegetation > 0);
 			_dustRate = new[] { 0f, 0.5f, 1f }[Mathf.Clamp(cfg.effects, 0, 2)];
 			foreach (ParticleSystem d in _dust.Values)
 			{

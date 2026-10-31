@@ -45,7 +45,7 @@ namespace GliderJam.UI
 
 		protected abstract void Build();
 
-		private Rect FitCover(Texture t)
+		protected Rect FitCover(Texture t)
 		{
 			float screen = 16f / 9f, img = (float)t.width / t.height;
 			return img > screen ? new Rect((1f - screen / img) * 0.5f, 0f, screen / img, 1f) : new Rect(0f, (1f - img / screen) * 0.5f, 1f, img / screen);

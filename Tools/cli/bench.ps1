@@ -24,6 +24,11 @@ Start-Sleep -Seconds 3
 for ($try = 1; $try -le 2 -and -not (Test-Path $log); $try++) {
     # The player occasionally hangs right after loading (rare, canyon only): kill it and try once more.
     $p = Start-Process -FilePath $exe -ArgumentList $a -PassThru
-    if (-not $p.WaitForExit(($Seconds + 120) * 1000)) { $p.Kill(); "timed out (attempt $try)"; Start-Sleep -Seconds 5 }
+    if (-not $p.WaitForExit(($Seconds + 120) * 1000))
+    {
+        $p.Kill(); "timed out (attempt $try)"; Start-Sleep -Seconds 5
+        # Keep the hung run's player log (the retry would overwrite it).
+        Move-Item -Force (Join-Path $logDir "$Name.log") (Join-Path $logDir "$Name.hang$try.log") -ErrorAction SilentlyContinue
+    }
 }
 if (Test-Path $log) { Get-Content $log } else { "no log written" }

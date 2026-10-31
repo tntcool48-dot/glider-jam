@@ -5,7 +5,7 @@ This folder is outside `Assets/`, so Unity never compiles or imports it.
 
 - `eval/*.cs`: snippets run with `unity command eval_file <file> --project-path F:\glider_jam\GliderJam`.
   `p1_*` are the Phase 1 conversion steps (materials, terrain placeholders, scenes, volume);
-  `build_city.cs`, `rebuild_gliders.cs` run the generators; the rest are inspection probes
+  `build_city.cs`, `canyon_setup.cs`, `rebuild_gliders.cs` run the generators; the rest are inspection probes
   (`ui_rects.cs`, `wing_uv_probe.cs`, `tex_probe.cs`, `floor_probe.cs`, ...).
   Files with `/*NAME*/`-style placeholders are templates filled in by the scripts below.
 - `shot.ps1 -Name <name>`: captures the Game view inline and writes `Screenshots/<name>.png`

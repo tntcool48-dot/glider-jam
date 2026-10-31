@@ -51,6 +51,8 @@ namespace GliderJam.EditorTools
 			amb.waterfalls = FindWaterfalls(route).ToArray();
 			EditorUtility.SetDirty(amb);
 			int spires = AddSpires(route);
+			amb.vines = AddVines(route.ceiling);
+			string trees = AddPillarTopTrees();
 
 			// Mist: drifting 3D noise in the valley fog volumes.
 			Texture3D noise = MistNoise();
@@ -66,20 +68,23 @@ namespace GliderJam.EditorTools
 				volumes++;
 			}
 
-			// Cumulus with clearer individual shapes.
+			// Separate cumulus with blue sky between them, based well above the flight ceiling (a base just above it
+			// read as one flat overcast sheet from the canyon floor).
 			var profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(AtmosphereSetup.ProfilePath);
 			var clouds = AtmosphereSetup.Get<VolumetricClouds>(profile);
-			AtmosphereSetup.P(clouds, "densityMultiplier", 0.45f);
-			AtmosphereSetup.P(clouds, "shapeFactor", 0.82f);
-			AtmosphereSetup.P(clouds, "shapeScale", 3.2f);
-			AtmosphereSetup.P(clouds, "erosionFactor", 0.65f);
+			AtmosphereSetup.P(clouds, "densityMultiplier", 0.6f);
+			AtmosphereSetup.P(clouds, "shapeFactor", 0.9f);
+			AtmosphereSetup.P(clouds, "shapeScale", 5f);
+			AtmosphereSetup.P(clouds, "erosionFactor", 0.8f);
 			AtmosphereSetup.P(clouds, "erosionScale", 120f);
+			AtmosphereSetup.P(clouds, "bottomAltitude", 800f);
+			AtmosphereSetup.P(clouds, "altitudeRange", 1400f);
 			EditorUtility.SetDirty(profile);
 
 			EditorSceneManager.MarkSceneDirty(go.scene);
 			EditorSceneManager.SaveOpenScenes();
 			AssetDatabase.SaveAssets();
-			return "canyon ambience: " + flocks.Count + " flocks, " + amb.waterfalls.Length + " waterfalls, " + spires + " spires/fins, mist volumes " + volumes + (AtmosphereSetup.Missing.Count > 0 ? "; missing: " + string.Join(", ", AtmosphereSetup.Missing) : "");
+			return "canyon ambience: " + flocks.Count + " flocks, " + amb.waterfalls.Length + " waterfalls, " + spires + " spires/fins, " + amb.vines.transform.childCount + " vine meshes, " + trees + ", mist volumes " + volumes + (AtmosphereSetup.Missing.Count > 0 ? "; missing: " + string.Join(", ", AtmosphereSetup.Missing) : "");
 		}
 
 		// Free routing lets players take any line through the open valley, so add more to weave through: sandstone spires
@@ -146,8 +151,259 @@ namespace GliderJam.EditorTools
 			return placed.Count;
 		}
 
+		private static float TerrainHeight(Terrain[] terrains, float x, float z)
+		{
+			foreach (Terrain t in terrains)
+			{
+				Vector3 p = t.transform.position, s = t.terrainData.size;
+				if (x >= p.x && x <= p.x + s.x && z >= p.z && z <= p.z + s.z) return t.SampleHeight(new Vector3(x, 0f, z)) + p.y;
+			}
+			return float.NaN;
+		}
+
+		// Highest corner of the heightmap cell under (x, z): the rendered surface never rises above it, whichever
+		// way the cell is split into triangles (on a cliff the split moves the wall by up to a cell).
+		private static float TerrainHeightMax(Terrain[] terrains, float x, float z)
+		{
+			foreach (Terrain t in terrains)
+			{
+				Vector3 p = t.transform.position, s = t.terrainData.size;
+				if (x < p.x || x > p.x + s.x || z < p.z || z > p.z + s.z) continue;
+				TerrainData d = t.terrainData;
+				int res = d.heightmapResolution;
+				int x0 = Mathf.Min((int)((x - p.x) / s.x * (res - 1)), res - 2), z0 = Mathf.Min((int)((z - p.z) / s.z * (res - 1)), res - 2);
+				return p.y + Mathf.Max(Mathf.Max(d.GetHeight(x0, z0), d.GetHeight(x0 + 1, z0)), Mathf.Max(d.GetHeight(x0, z0 + 1), d.GetHeight(x0 + 1, z0 + 1)));
+			}
+			return float.NaN;
+		}
+
+		// Curtains of ivy hanging from cliff lips across the corridor: lips are found where the terrain drops 25 m+
+		// within 6 m; each picked lip gets a curtain of overlapping strands, longest in the middle, each draped down
+		// the face (re-fitted to the wall every 2.5 m so it follows slopes), merged into one mesh per 1 km of
+		// corridor. Alpha-cut double-sided leaves; no shadows, not ray traced; hidden at the lowest vegetation setting.
+		private static GameObject AddVines(float ceiling)
+		{
+			GameObject old = GameObject.Find("/Canyon Vines");
+			if (old != null) Object.DestroyImmediate(old);
+			var root = new GameObject("Canyon Vines");
+			Terrain[] terrains = Terrain.activeTerrains;
+			Material mat = VineMaterial();
+			var rng = new System.Random(777);
+			float Rn(float a, float b) => a + (b - a) * (float)rng.NextDouble();
+			Directory.CreateDirectory(Dir + "/Vines");
+			foreach (string guid in AssetDatabase.FindAssets("t:Mesh", new[] { Dir + "/Vines" })) AssetDatabase.DeleteAsset(AssetDatabase.GUIDToAssetPath(guid));
+			int strands = 0, curtains = 0;
+			for (float z0 = 0f; z0 < 7000f; z0 += 1000f)
+			{
+				var v = new List<Vector3>();
+				var n = new List<Vector3>();
+				var uv = new List<Vector2>();
+				var tris = new List<int>();
+				for (float z = z0; z < z0 + 1000f; z += 10f)
+				{
+					for (float x = 10f; x < 990f; x += 10f)
+					{
+						if (rng.NextDouble() > 0.12) continue;
+						float h = TerrainHeight(terrains, x, z);
+						if (float.IsNaN(h) || h < 50f || h > ceiling + 60f) continue;
+						// downhill direction from the height gradient, so the curtain lies flat along the cliff face
+						var grad = new Vector2(TerrainHeight(terrains, x + 4f, z) - TerrainHeight(terrains, x - 4f, z), TerrainHeight(terrains, x, z + 4f) - TerrainHeight(terrains, x, z - 4f));
+						if (float.IsNaN(grad.x) || float.IsNaN(grad.y) || grad.magnitude < 4f) continue;
+						Vector2 d = -grad.normalized;
+						float below = TerrainHeight(terrains, x + d.x * 6f, z + d.y * 6f);
+						if (float.IsNaN(below) || h - below < 25f) continue;
+						var outDir = new Vector3(d.x, 0f, d.y);
+						var along = new Vector3(-d.y, 0f, d.x);
+						float span = Rn(4f, 12f);
+						int count = Mathf.CeilToInt(span / 0.8f);
+						curtains++;
+						for (int k = 0; k < count; k++)
+						{
+							float lat = -span * 0.5f + span * k / Mathf.Max(1, count - 1) + Rn(-0.3f, 0.3f);
+							float mid = 1f - Mathf.Abs(lat) / (span * 0.5f + 0.01f);
+							float len = Mathf.Min(Rn(5f, 12f) + mid * Rn(6f, 22f), h - below - 3f), w = Rn(1.2f, 2f);
+							float lx = x + along.x * lat, lz = z + along.z * lat;
+							float top = TerrainHeight(terrains, lx, lz);
+							if (float.IsNaN(top) || len < 3f) continue;
+							int segs = Mathf.Max(2, Mathf.CeilToInt(len / 2.5f)), i0 = v.Count;
+							float sway = Rn(0f, 6.28f), v0 = Rn(0f, 1f);
+							var offs = new float[segs + 1];
+							for (int j = 0; j <= segs; j++)
+							{
+								float y = top - 0.3f - len * j / segs;
+								for (float s = 0f; s <= 16f; s += 0.25f) // the wall at this height: walk outward until the ground is below y
+								{
+									offs[j] = s;
+									float g = TerrainHeightMax(terrains, lx + d.x * s, lz + d.y * s);
+									if (float.IsNaN(g) || g < y) break;
+								}
+							}
+							// smooth the drape without letting it into the wall: dilate (max of neighbours), then average
+							var dil = new float[segs + 1];
+							for (int j = 0; j <= segs; j++) dil[j] = Mathf.Max(offs[j], Mathf.Max(offs[Mathf.Max(0, j - 1)], offs[Mathf.Min(segs, j + 1)]));
+							for (int j = 0; j <= segs; j++)
+							{
+								float t = j / (float)segs, y = top - 0.3f - len * t;
+								float off = (dil[Mathf.Max(0, j - 1)] + dil[j] + dil[Mathf.Min(segs, j + 1)]) / 3f;
+								Vector3 c = new Vector3(lx, y, lz) + outDir * (off + 0.3f) + along * (0.25f * Mathf.Sin(sway + j * 0.7f));
+								float hw = w * 0.5f * Mathf.Lerp(1f, 0.55f, t); // tapering tips
+								v.Add(c - along * hw);
+								v.Add(c + along * hw);
+								n.Add(outDir);
+								n.Add(outDir);
+								float tv = v0 + len * (1f - t) / 5f; // texture repeats every 5 m down the strand
+								uv.Add(new Vector2(0f, tv));
+								uv.Add(new Vector2(1f, tv));
+								if (j > 0)
+								{
+									int a = i0 + (j - 1) * 2;
+									tris.AddRange(new[] { a, a + 1, a + 3, a, a + 3, a + 2 });
+								}
+							}
+							strands++;
+						}
+					}
+				}
+				if (v.Count == 0) continue;
+				var m = new Mesh { name = "Vines_" + (int)z0, indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+				m.SetVertices(v);
+				m.SetNormals(n);
+				m.SetUVs(0, uv);
+				m.SetTriangles(tris, 0);
+				m.RecalculateTangents();
+				m.RecalculateBounds();
+				AssetDatabase.CreateAsset(m, Dir + "/Vines/Vines_" + (int)z0 + ".asset");
+				var go = new GameObject("Vines " + (int)z0);
+				go.transform.SetParent(root.transform, false);
+				go.AddComponent<MeshFilter>().sharedMesh = m;
+				var r = go.AddComponent<MeshRenderer>();
+				r.sharedMaterial = mat;
+				r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+				r.rayTracingMode = UnityEngine.Experimental.Rendering.RayTracingMode.Off;
+			}
+			Debug.Log("[GliderJam] vines: " + curtains + " curtains, " + strands + " strands");
+			return root;
+		}
+
+		// Ivy: a wavy stem densely covered in small leaves of several greens (a few yellowed), alpha cut; tiles vertically.
+		private static Material VineMaterial()
+		{
+			const int w = 128, h = 512;
+			var px = new Color[w * h];
+			var rng = new System.Random(31);
+			float Stem(float y) => 0.5f + 0.1f * Mathf.Sin(y / h * Mathf.PI * 6f); // three waves per tile
+			for (int y = 0; y < h; y++)
+			{
+				int sx = Mathf.RoundToInt(Stem(y) * w);
+				for (int x = sx - 2; x <= sx + 2; x++) px[y * w + x] = new Color(0.22f, 0.2f, 0.09f, 1f);
+			}
+			for (int i = 0; i < 900; i++)
+			{
+				float cy = (float)rng.NextDouble() * h;
+				float cx = (Stem(cy) + (float)(rng.NextDouble() + rng.NextDouble() - 1.0) * 0.4f) * w; // denser near the stem
+				float r = 5f + (float)rng.NextDouble() * 6f, ang = (float)rng.NextDouble() * Mathf.PI;
+				float ca = Mathf.Cos(ang), sa = Mathf.Sin(ang), g = 0.6f + 0.6f * (float)rng.NextDouble();
+				var leaf = rng.NextDouble() < 0.12 ? new Color(0.42f, 0.44f, 0.12f) : new Color(0.12f * g + 0.03f, 0.45f * g + 0.08f, 0.09f * g);
+				for (int dy = -12; dy <= 12; dy++)
+				{
+					for (int dx = -12; dx <= 12; dx++)
+					{
+						float ex = dx * ca + dy * sa, ey = -dx * sa + dy * ca;
+						float e = ex * ex / (r * r) + ey * ey / (r * r * 0.35f);
+						int x = Mathf.RoundToInt(cx) + dx;
+						if (e > 1f || x < 0 || x >= w) continue;
+						int y = ((Mathf.RoundToInt(cy) + dy) % h + h) % h;
+						float shade = (1f - 0.35f * e) * (Mathf.Abs(ey) < 0.6f ? 1.15f : 1f); // darker rim, light midrib
+						px[y * w + x] = new Color(leaf.r * shade, leaf.g * shade, leaf.b * shade, 1f);
+					}
+				}
+			}
+			string path = Dir + "/fx_vine.png";
+			var tex = new Texture2D(w, h, TextureFormat.RGBA32, true);
+			tex.SetPixels(px);
+			tex.Apply();
+			File.WriteAllBytes(path, tex.EncodeToPNG());
+			Object.DestroyImmediate(tex);
+			AssetDatabase.ImportAsset(path);
+			var ti = (TextureImporter)AssetImporter.GetAtPath(path);
+			ti.alphaIsTransparency = true;
+			ti.mipMapsPreserveCoverage = true;
+			ti.alphaTestReferenceValue = 0.5f;
+			ti.wrapMode = TextureWrapMode.Repeat;
+			ti.SaveAndReimport();
+			string mpath = Dir + "/Canyon_Vines.mat";
+			var m = AssetDatabase.LoadAssetAtPath<Material>(mpath);
+			if (m == null)
+			{
+				m = new Material(Shader.Find("HDRP/Lit"));
+				AssetDatabase.CreateAsset(m, mpath);
+			}
+			m.SetTexture("_BaseColorMap", AssetDatabase.LoadAssetAtPath<Texture2D>(path));
+			m.SetColor("_BaseColor", Color.white);
+			m.SetFloat("_Smoothness", 0.3f);
+			m.SetFloat("_AlphaCutoffEnable", 1f);
+			m.SetFloat("_AlphaCutoff", 0.5f);
+			m.SetFloat("_DoubleSidedEnable", 1f);
+			m.SetFloat("_DoubleSidedNormalMode", 1f);
+			UnityEditor.Rendering.HighDefinition.HDShaderUtils.ResetMaterialKeywords(m);
+			EditorUtility.SetDirty(m);
+			return m;
+		}
+
+		// Added trees carry this (invisible) tint so a re-run replaces them instead of stacking more.
+		private static readonly Color32 AddedTreeTint = new Color32(255, 255, 254, 255);
+
+		// Denser forest on the pillar tops: extra terrain trees (same prototypes, so they also collide) in clumps on
+		// flat high ground, skipping spots within 5 m of an existing tree.
+		private static string AddPillarTopTrees()
+		{
+			int added = 0, before = 0;
+			foreach (Terrain t in Terrain.activeTerrains)
+			{
+				TerrainData d = t.terrainData;
+				if (d.treePrototypes.Length == 0) continue;
+				var trees = new List<TreeInstance>(d.treeInstances);
+				trees.RemoveAll(ti => ti.color.Equals(AddedTreeTint));
+				before += trees.Count;
+				Vector3 o = t.transform.position, s = d.size;
+				var occupied = new HashSet<Vector2Int>();
+				foreach (TreeInstance ti in trees) occupied.Add(new Vector2Int(Mathf.FloorToInt(ti.position.x * s.x / 5f), Mathf.FloorToInt(ti.position.z * s.z / 5f)));
+				var rng = new System.Random((int)(o.x * 7f + o.z * 13f));
+				for (float lz = 3f; lz < s.z; lz += 7f)
+				{
+					for (float lx = 3f; lx < s.x; lx += 7f)
+					{
+						float u = lx / s.x, w = lz / s.z;
+						float hgt = d.GetInterpolatedHeight(u, w);
+						if (hgt < 110f || d.GetSteepness(u, w) > 22f) continue;
+						float wx = o.x + lx, wz = o.z + lz;
+						if (WorldNoise.Fbm(wx / 90f, wz / 90f, 3) < -0.05f || rng.NextDouble() > 0.6) continue; // clumps
+						var cell = new Vector2Int(Mathf.FloorToInt(lx / 5f), Mathf.FloorToInt(lz / 5f));
+						if (occupied.Contains(cell)) continue;
+						occupied.Add(cell);
+						float jx = (float)rng.NextDouble() * 3f - 1.5f, jz = (float)rng.NextDouble() * 3f - 1.5f;
+						float scale = 0.8f + (float)rng.NextDouble() * 0.5f;
+						trees.Add(new TreeInstance
+						{
+							position = new Vector3(Mathf.Clamp01((lx + jx) / s.x), 0f, Mathf.Clamp01((lz + jz) / s.z)),
+							prototypeIndex = rng.Next(d.treePrototypes.Length),
+							widthScale = scale,
+							heightScale = scale * (0.9f + (float)rng.NextDouble() * 0.3f),
+							rotation = (float)rng.NextDouble() * Mathf.PI * 2f,
+							color = AddedTreeTint,
+							lightmapColor = Color.white
+						});
+						added++;
+					}
+				}
+				d.SetTreeInstances(trees.ToArray(), true);
+				EditorUtility.SetDirty(d);
+			}
+			return "trees " + before + " + " + added;
+		}
+
 		// Tapering sandstone column with strata ledges and noise, a rounded grassy top; vertex colours are the terrain
-		// material's layer weights (grass, scree, moss).
+		// material's layer weights (grass, dark rock, moss).
 		private static Mesh SpireMesh(float radius, float height, float sx, float sz, int seed)
 		{
 			const int seg = 24, rings = 30;
@@ -168,7 +424,8 @@ namespace GliderJam.EditorTools
 					v.Add(new Vector3(Mathf.Cos(a) * r * sx, y, Mathf.Sin(a) * r * sz));
 					float moss = Mathf.Clamp01(0.25f + 0.9f * WorldNoise.Perlin3(Mathf.Cos(a) * 3f, y / 20f, Mathf.Sin(a) * 3f + seed)) * Mathf.Lerp(0.9f, 0.3f, t);
 					byte grass = (byte)(t > 0.95f ? 255 : 0);
-					col.Add(new Color32(grass, 0, (byte)(moss * 255f), 255));
+					float band = seed % 2 == 0 ? WorldNoise.SmoothStep(0.62f, 0.8f, Mathf.Sin(y / 14f + seed * 1.7f + n * 3f) * 0.5f + 0.5f) : 0f; // dark rock bands
+					col.Add(new Color32(grass, (byte)(band * 255f), (byte)(moss * 255f), 255));
 				}
 			}
 			int row = seg + 1;

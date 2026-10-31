@@ -108,10 +108,10 @@ MonoBehaviour:
     m_Value: {x: 0, y: 0}
   bottomAltitude:
     m_OverrideState: 1
-    m_Value: 330
+    m_Value: 800
   altitudeRange:
     m_OverrideState: 1
-    m_Value: 1200
+    m_Value: 1400
   fadeInMode:
     m_OverrideState: 0
     m_Value: 0
@@ -297,19 +297,19 @@ MonoBehaviour:
     m_Value: 0.5
   densityMultiplier:
     m_OverrideState: 1
-    m_Value: 0.45
+    m_Value: 0.6
   shapeFactor:
     m_OverrideState: 1
-    m_Value: 0.82
+    m_Value: 0.9
   shapeScale:
     m_OverrideState: 1
-    m_Value: 3.2
+    m_Value: 5
   shapeOffset:
     m_OverrideState: 0
     m_Value: {x: 0, y: 0, z: 0}
   erosionFactor:
     m_OverrideState: 1
-    m_Value: 0.65
+    m_Value: 0.8
   erosionScale:
     m_OverrideState: 1
     m_Value: 120

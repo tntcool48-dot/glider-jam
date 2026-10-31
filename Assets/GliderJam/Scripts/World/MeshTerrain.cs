@@ -1,5 +1,6 @@
 using System.Collections.Generic;
-using System.Threading.Tasks;
+using System;
+using System.Threading;
 using UnityEngine;
 
 namespace GliderJam.World
@@ -127,12 +128,14 @@ namespace GliderJam.World
 				}
 			}
 
-			Parallel.For(0, jobs.Count, i => BuildChunkData(jobs[i]));
-
+			var clock = System.Diagnostics.Stopwatch.StartNew();
+			BuildAll(jobs);
+			long built = clock.ElapsedMilliseconds;
 			foreach (ChunkJob job in jobs)
 			{
 				CreateChunkObject(root.transform, job);
 			}
+			if (Application.isPlaying) Debug.Log("[GliderJam] terrain: " + jobs.Count + " chunks, meshes " + built + " ms, objects " + (clock.ElapsedMilliseconds - built) + " ms");
 			foreach (Terrain t in _terrains)
 			{
 				t.drawHeightmap = false;
@@ -190,6 +193,31 @@ namespace GliderJam.World
 			float a = Mathf.Lerp(_h[z0, x0], _h[z0, x0 + 1], fx);
 			float b = Mathf.Lerp(_h[z0 + 1, x0], _h[z0 + 1, x0 + 1], fx);
 			return Mathf.Lerp(a, b, fz);
+		}
+
+		// Chunk meshes on dedicated worker threads (not the .NET thread pool, which very rarely hung the player while the
+		// scene was loading); the main thread joins them all.
+		private void BuildAll(List<ChunkJob> jobs)
+		{
+			int next = -1;
+			var errors = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
+			int workers = Mathf.Clamp(Environment.ProcessorCount - 1, 1, 8);
+			var threads = new Thread[workers];
+			for (int w = 0; w < workers; w++)
+			{
+				threads[w] = new Thread(() =>
+				{
+					int i;
+					while ((i = Interlocked.Increment(ref next)) < jobs.Count)
+					{
+						try { BuildChunkData(jobs[i]); }
+						catch (Exception e) { errors.Enqueue(e); }
+					}
+				}) { IsBackground = true, Name = "TerrainChunks" };
+				threads[w].Start();
+			}
+			foreach (Thread t in threads) t.Join();
+			foreach (Exception e in errors) Debug.LogException(e);
 		}
 
 		// Height of the surrounding landscape: walls blend out of the corridor edge into a low basin with
@@ -352,6 +380,11 @@ namespace GliderJam.World
 			// Large-scale breakup on flat ground so the planar textures don't read as a repeating grid from the air.
 			float macroA = WorldNoise.Fbm(x / 230f, z / 230f, 3), macroB = WorldNoise.Fbm(x / 310f - 40f, z / 310f + 17f, 3);
 			scree = Mathf.Max(scree, grass * WorldNoise.SmoothStep(0.3f, 0.55f, macroA) * 0.45f);
+			// Second rock: dark strata bands across steep faces, wavering in height and present only in some regions,
+			// so the pillars aren't all the same orange sandstone.
+			float band = Mathf.Sin(y / 14f + WorldNoise.Fbm(x / 170f, z / 170f, 2) * 5f) * 0.5f + 0.5f;
+			float region = WorldNoise.SmoothStep(-0.05f, 0.3f, WorldNoise.Fbm(x / 420f + 13f, z / 420f - 6f, 3));
+			scree = Mathf.Max(scree, WorldNoise.SmoothStep(0.62f, 0.8f, band) * region * WorldNoise.SmoothStep(38f, 55f, slope));
 			moss = Mathf.Max(moss, grass * WorldNoise.SmoothStep(-0.1f, -0.4f, macroB) * 0.9f);
 			return new Color32((byte)(grass * 255f), (byte)(scree * 255f), (byte)(moss * 255f), 255);
 		}
