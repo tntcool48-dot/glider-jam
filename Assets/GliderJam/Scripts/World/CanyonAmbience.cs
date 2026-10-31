@@ -13,6 +13,8 @@ namespace GliderJam.World
 		public Material waterMaterial;
 		public Material birdMaterial;
 		public Material dustMaterial;
+		public Material waterfallMaterial;
+		public Vector4[] waterfalls = new Vector4[0]; // top edge (xyz) and the yaw (degrees) it falls towards
 		public float waterLevel = 2.5f;
 		public Rect waterArea = new Rect(0f, 0f, 1000f, 7000f);
 		public Vector3[] flocks = new Vector3[0];
@@ -38,6 +40,88 @@ namespace GliderJam.World
 			{
 				for (int i = 0; i < flocks.Length; i++) _birds.Add(MakeFlock(flocks[i], i));
 			}
+			if (waterfallMaterial != null)
+			{
+				foreach (Vector4 w in waterfalls) MakeWaterfall(new Vector3(w.x, w.y, w.z), w.w);
+			}
+		}
+
+		private readonly List<GameObject> _falls = new List<GameObject>();
+
+		// Water spilling over a pillar edge: a widening plume falling under gravity, spray mist at the foot.
+		private void MakeWaterfall(Vector3 top, float yaw)
+		{
+			var root = new GameObject("Waterfall");
+			root.transform.SetParent(transform, false);
+			root.transform.SetPositionAndRotation(top, Quaternion.Euler(0f, yaw, 0f));
+			_falls.Add(root);
+			float drop = Mathf.Max(20f, top.y - waterLevel);
+			float fallTime = Mathf.Sqrt(2f * drop / 9.81f);
+
+			var ps = root.AddComponent<ParticleSystem>();
+			ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+			var main = ps.main;
+			main.loop = true;
+			main.duration = 3f;
+			main.prewarm = true;
+			main.startLifetime = fallTime;
+			main.startSpeed = new ParticleSystem.MinMaxCurve(3f, 5f);
+			main.startSize = new ParticleSystem.MinMaxCurve(1.6f, 2.6f);
+			main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+			main.startColor = new Color(0.95f, 0.97f, 1f, 0.42f);
+			main.gravityModifier = 1f;
+			main.simulationSpace = ParticleSystemSimulationSpace.World;
+			main.maxParticles = 2500;
+			var e = ps.emission;
+			e.rateOverTime = 260f;
+			var shape = ps.shape;
+			shape.shapeType = ParticleSystemShapeType.Box;
+			shape.scale = new Vector3(9f, 0.5f, 0.5f);
+			var size = ps.sizeOverLifetime;
+			size.enabled = true;
+			size.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 2.6f)));
+			var col = ps.colorOverLifetime;
+			col.enabled = true;
+			var g = new Gradient();
+			g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+				new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0.6f, 0.7f), new GradientAlphaKey(0f, 1f) });
+			col.color = g;
+			var r = root.GetComponent<ParticleSystemRenderer>();
+			r.renderMode = ParticleSystemRenderMode.Stretch; // falling streaks
+			r.velocityScale = 0.06f;
+			r.lengthScale = 1.2f;
+			r.sharedMaterial = waterfallMaterial;
+			r.shadowCastingMode = ShadowCastingMode.Off;
+			r.receiveShadows = false;
+			ps.Play();
+
+			var spray = new GameObject("Spray");
+			spray.transform.SetParent(root.transform, false);
+			spray.transform.position = new Vector3(top.x, waterLevel + 4f, top.z) + root.transform.forward * (4f + 2.2f * fallTime);
+			var sp = spray.AddComponent<ParticleSystem>();
+			sp.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+			var sm = sp.main;
+			sm.loop = true;
+			sm.prewarm = true;
+			sm.startLifetime = new ParticleSystem.MinMaxCurve(3f, 5f);
+			sm.startSpeed = new ParticleSystem.MinMaxCurve(1f, 4f);
+			sm.startSize = new ParticleSystem.MinMaxCurve(12f, 22f);
+			sm.startColor = new Color(0.92f, 0.95f, 1f, 0.18f);
+			sm.simulationSpace = ParticleSystemSimulationSpace.World;
+			sm.maxParticles = 80;
+			var se = sp.emission;
+			se.rateOverTime = 14f;
+			var ss = sp.shape;
+			ss.shapeType = ParticleSystemShapeType.Hemisphere;
+			ss.radius = 6f;
+			var scol = sp.colorOverLifetime;
+			scol.enabled = true;
+			scol.color = g;
+			var sr = spray.GetComponent<ParticleSystemRenderer>();
+			sr.sharedMaterial = waterfallMaterial;
+			sr.shadowCastingMode = ShadowCastingMode.Off;
+			sr.receiveShadows = false;
+			sp.Play();
 		}
 
 		private void Start()
@@ -62,6 +146,7 @@ namespace GliderJam.World
 			}
 			_birdsOn = cfg.effects > 0;
 			foreach (ParticleSystem b in _birds) b.gameObject.SetActive(_birdsOn);
+			foreach (GameObject f in _falls) f.SetActive(cfg.effects > 0);
 			_dustRate = new[] { 0f, 0.5f, 1f }[Mathf.Clamp(cfg.effects, 0, 2)];
 			foreach (ParticleSystem d in _dust.Values)
 			{

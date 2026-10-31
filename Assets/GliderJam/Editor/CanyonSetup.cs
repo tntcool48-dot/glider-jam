@@ -47,6 +47,8 @@ namespace GliderJam.EditorTools
 				flocks.Add(c);
 			}
 			amb.flocks = flocks.ToArray();
+			amb.waterfallMaterial = AssetDatabase.LoadAssetAtPath<Material>("Assets/GliderJam/Art/FX/FX_Smoke.mat");
+			amb.waterfalls = FindWaterfalls(route).ToArray();
 			EditorUtility.SetDirty(amb);
 
 			// Mist: drifting 3D noise in the valley fog volumes.
@@ -76,7 +78,69 @@ namespace GliderJam.EditorTools
 			EditorSceneManager.MarkSceneDirty(go.scene);
 			EditorSceneManager.SaveOpenScenes();
 			AssetDatabase.SaveAssets();
-			return "canyon ambience: " + flocks.Count + " flocks, mist volumes " + volumes + (AtmosphereSetup.Missing.Count > 0 ? "; missing: " + string.Join(", ", AtmosphereSetup.Missing) : "");
+			return "canyon ambience: " + flocks.Count + " flocks, " + amb.waterfalls.Length + " waterfalls, mist volumes " + volumes + (AtmosphereSetup.Missing.Count > 0 ? "; missing: " + string.Join(", ", AtmosphereSetup.Missing) : "");
+		}
+
+		// Pillar edges beside the race line where water can spill towards it: walk outwards from the line until the
+		// terrain rises steeply, climb to the lip, keep lips below the ceiling, about 800 m apart, alternating sides.
+		private static List<Vector4> FindWaterfalls(RaceRoute route)
+		{
+			Terrain[] terrains = Terrain.activeTerrains;
+			float H(float x, float z)
+			{
+				foreach (Terrain t in terrains)
+				{
+					Vector3 p = t.transform.position, s = t.terrainData.size;
+					if (x >= p.x && x <= p.x + s.x && z >= p.z && z <= p.z + s.z) return t.SampleHeight(new Vector3(x, 0f, z)) + p.y;
+				}
+				return float.NaN;
+			}
+			var falls = new List<Vector4>();
+			float lastZ = float.MinValue;
+			int flip = 0;
+			for (int i = 20; i < route.path.Length - 10 && falls.Count < 7; i += 3)
+			{
+				Vector3 p = route.path[i];
+				if (p.z - lastZ < 800f) continue;
+				Vector3 f = Vector3.ProjectOnPlane(route.path[i + 2] - route.path[i], Vector3.up).normalized;
+				foreach (float sgn in flip % 2 == 0 ? new[] { 1f, -1f } : new[] { -1f, 1f })
+				{
+					Vector3 side = Vector3.Cross(Vector3.up, f) * sgn;
+					float prev = H(p.x, p.z);
+					bool found = false;
+					for (float d = 30f; d < 260f && !found; d += 6f)
+					{
+						Vector3 q = p + side * d;
+						float h = H(q.x, q.z);
+						if (float.IsNaN(h) || float.IsNaN(prev)) break;
+						if (h - prev > 18f && h > 60f)
+						{
+							float top = h;
+							Vector3 lip = q;
+							for (float d2 = d + 3f; d2 < d + 80f; d2 += 3f)
+							{
+								Vector3 q2 = p + side * d2;
+								float h2 = H(q2.x, q2.z);
+								if (float.IsNaN(h2) || h2 - top < 1.5f) break;
+								top = h2;
+								lip = q2;
+							}
+							if (top > 90f && top < route.ceiling - 20f)
+							{
+								Vector3 edge = new Vector3(lip.x, top + 1f, lip.z) - side * 1.5f;
+								falls.Add(new Vector4(edge.x, edge.y, edge.z, Mathf.Atan2(-side.x, -side.z) * Mathf.Rad2Deg));
+								lastZ = p.z;
+								flip++;
+								found = true;
+							}
+							break;
+						}
+						prev = h;
+					}
+					if (found) break;
+				}
+			}
+			return falls;
 		}
 
 		// Four wing-flap frames of a distant bird silhouette (256 x 64).

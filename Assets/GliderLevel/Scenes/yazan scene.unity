@@ -53335,6 +53335,15 @@ MonoBehaviour:
   waterMaterial: {fileID: 2100000, guid: c8d07a1f22d291d4c8036732161ae232, type: 2}
   birdMaterial: {fileID: 2100000, guid: 321db51a3ca801b4f80c20ebe3097ed0, type: 2}
   dustMaterial: {fileID: 2100000, guid: b178299c778f69a4f93153793c8fd4f0, type: 2}
+  waterfallMaterial: {fileID: 2100000, guid: b7207e77cc0b6354ab99d510f1e301af, type: 2}
+  waterfalls:
+  - {x: 463.5, y: 205.85728, z: 643.0937, w: -90}
+  - {x: 190.08948, y: 173.17665, z: 1411.0319, w: 55.629173}
+  - {x: 535.9295, y: 139.81252, z: 2370.9744, w: 17.041891}
+  - {x: 488.68805, y: 204.00311, z: 3206.017, w: 66.81896}
+  - {x: 547.7384, y: 155.3444, z: 3968.6184, w: 44.999878}
+  - {x: 579.5329, y: 204.00311, z: 4970.9326, w: 116.673035}
+  - {x: 683.5, y: 202.8372, z: 5765.2207, w: -90}
   waterLevel: 2.5
   waterArea:
     serializedVersion: 2
