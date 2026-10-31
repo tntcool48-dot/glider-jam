@@ -99,13 +99,14 @@ namespace GliderJam
 #endif
 		}
 
-		// Ray tracing on the canyon in split-screen overwhelms the GPU driver (two views tracing into the layered terrain
-		// material: single-digit fps, failed pipeline builds on an RX 7900 XT). Screen-space effects stand in there;
-		// solo races, the city and the menu flyover keep ray tracing.
-		public static bool RayTracingAllowed =>
-			!(GameSettings.Mode == GameMode.SplitScreen && !GameSettings.Showcase && SceneManager.GetActiveScene().name == GameSettings.RaceScene);
+		// Per-map ray tracing. The canyon's layered terrain material makes ray traced GI / AO far too heavy, and in
+		// split-screen even ray traced reflections overwhelm the GPU driver (single-digit fps, failed pipeline builds on
+		// an RX 7900 XT): reflections only, solo only. The city (and anything else) gets everything the settings ask for.
+		private static bool CanyonLoaded => SceneManager.GetSceneByName(GameSettings.RaceScene).isLoaded;
+		private static bool SplitRace => GameSettings.Mode == GameMode.SplitScreen && !GameSettings.Showcase;
+		public static bool RayTracingAllowed => !(CanyonLoaded && SplitRace);
 
-		private static bool RT(int setting) => setting == 2 && RayTracingAllowed;
+		private static bool RT(int setting, bool reflections = false) => setting == 2 && RayTracingAllowed && (reflections || !CanyonLoaded);
 
 		// Low -> Performant, Medium -> Balanced, High/Ultra/Custom -> High Fidelity, any ray traced option -> Ultra RT.
 		private static void ApplyQualityLevel(GameConfig cfg)
@@ -162,8 +163,17 @@ namespace GliderJam
 			var ssr = Get<ScreenSpaceReflection>();
 			ssr.enabled.Override(cfg.reflections > 0);
 			ssr.enabledTransparent.Override(cfg.reflections > 0);
-			ssr.tracing.Override(RT(cfg.reflections) ? RayCastingMode.RayTracing : RayCastingMode.RayMarching);
-			ssr.quality.Override(RT(cfg.reflections) ? 2 : 1);
+			bool rtr = RT(cfg.reflections, true);
+			ssr.tracing.Override(rtr ? RayCastingMode.RayTracing : RayCastingMode.RayMarching);
+			ssr.quality.Override(rtr ? 2 : 1);
+			// Performance mode (full resolution via the Ultra RT asset) gave clearly richer mirror-glass and wet-street
+			// reflections than Quality mode in side-by-side renders, and costs less.
+			ssr.mode.Override(RayTracingMode.Performance);
+			ssr.bounceCount.Override(1);
+			ssr.sampleCount.Override(1);
+			// The default firefly clamp (exposed intensity 1) crushes reflected neon to a dull smear; 10 lets it through
+			// without blowing out highlights on chrome.
+			OverridePrivate(ssr, "m_ClampValue", rtr ? 10f : 1f);
 
 			var gi = Get<GlobalIllumination>();
 			gi.enable.Override(cfg.globalIllumination > 0);
@@ -174,6 +184,13 @@ namespace GliderJam
 			if (cfg.motionBlur) mb.intensity.overrideState = false; else mb.intensity.Override(0f);
 			var grain = Get<FilmGrain>();
 			if (cfg.filmGrain) grain.intensity.overrideState = false; else grain.intensity.Override(0f);
+		}
+
+		// Overrides a volume parameter HDRP only exposes through a plain property (no override state).
+		private static void OverridePrivate(VolumeComponent c, string field, float value)
+		{
+			var p = c.GetType().GetField(field, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(c) as VolumeParameter<float>;
+			if (p != null) p.Override(value);
 		}
 
 		public static void ConfigureCamera(Camera cam, GameConfig cfg)

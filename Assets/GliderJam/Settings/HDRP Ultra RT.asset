@@ -467,8 +467,8 @@ MonoBehaviour:
       RTAORayLength:
       - 0.5
       - 3
-      - 20
-      RTAOSampleCount: 010000000200000008000000
+      - 4
+      RTAOSampleCount: 010000000200000002000000
       RTAODenoise: 010101
       RTAODenoiserRadius:
       - 0.25
@@ -477,7 +477,7 @@ MonoBehaviour:
       RTGIRayLength:
       - 50
       - 50
-      - 50
+      - 300
       RTGIFullResolution: 000001
       RTGIRaySteps: 200000003000000040000000
       RTGIDenoise: 010101
@@ -490,22 +490,22 @@ MonoBehaviour:
       RTRMinSmoothness:
       - 0.6
       - 0.4
-      - 0
+      - 0.45
       RTRSmoothnessFadeStart:
       - 0.7
       - 0.5
-      - 0
+      - 0.55
       RTRRayLength:
       - 50
       - 50
-      - 50
+      - 2000
       RTRFullResolution: 000001
       RTRRayMaxIterations: 200000003000000040000000
       RTRDenoise: 010101
       RTRDenoiserRadiusDimmer:
       - 0.75
       - 0.75
-      - 1
+      - 0.6
       RTRDenoiserAntiFlicker:
       - 1
       - 1

@@ -733,13 +733,13 @@ MonoBehaviour:
     m_Value: 0
   top:
     m_OverrideState: 1
-    m_Value: {r: 0.06, g: 0.08, b: 0.2, a: 1}
+    m_Value: {r: 0.09, g: 0.11, b: 0.3, a: 1}
   middle:
     m_OverrideState: 1
-    m_Value: {r: 0.55, g: 0.32, b: 0.85, a: 1}
+    m_Value: {r: 0.85, g: 0.45, b: 1.25, a: 1}
   bottom:
     m_OverrideState: 1
-    m_Value: {r: 3.2, g: 1.35, b: 1.7, a: 1}
+    m_Value: {r: 3.8, g: 1.6, b: 2.1, a: 1}
   gradientDiffusion:
     m_OverrideState: 1
     m_Value: 2.4
@@ -820,7 +820,7 @@ MonoBehaviour:
     m_Value: 1
   fixedExposure:
     m_OverrideState: 1
-    m_Value: 3.3
+    m_Value: 3
   compensation:
     m_OverrideState: 0
     m_Value: 0

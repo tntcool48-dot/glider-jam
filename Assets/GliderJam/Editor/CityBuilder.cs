@@ -31,7 +31,7 @@ namespace GliderJam.EditorTools
 		private const int TileCols = 16, TileFloors = 32, CellPx = 64, FloorPx = 48;
 		private const int CoreI0 = -5, CoreI1 = 5, CoreJ0 = -3, CoreJ1 = 22;
 
-		private enum Slot { Glass, GlassPink, Housing, Concrete, Office, Dim, Roof, Pavement, Marking, Metal, Lamp, Water, NeonPink, NeonCyan, NeonViolet, NeonAmber, NeonGreen, Count }
+		private enum Slot { Glass, GlassPink, Housing, Concrete, Office, Dim, Mirror, MirrorGold, Chrome, Marble, Roof, Pavement, Marking, Metal, Lamp, Water, NeonPink, NeonCyan, NeonViolet, NeonAmber, NeonGreen, Count }
 		private static readonly Slot[] NeonSlots = { Slot.NeonPink, Slot.NeonCyan, Slot.NeonViolet, Slot.NeonAmber, Slot.NeonGreen };
 		private static readonly Color[] NeonColors = { new Color(1f, 0.12f, 0.5f), new Color(0.05f, 0.85f, 1f), new Color(0.62f, 0.25f, 1f), new Color(1f, 0.55f, 0.1f), new Color(0.2f, 1f, 0.45f) };
 
@@ -68,6 +68,7 @@ namespace GliderJam.EditorTools
 			Bridges.Clear();
 			Boards.Clear();
 			Solids.Clear();
+			Cylinders.Clear();
 			_signLights = 0;
 			AtmosphereSetup.Missing.Clear();
 			Directory.CreateDirectory(Dir + "/Meshes");
@@ -249,6 +250,15 @@ namespace GliderJam.EditorTools
 			Tube(mb, new Vector3(x1, y, z0), new Vector3(x1, y, z1), w, s);
 		}
 
+		// Vertical cylinder (base centre, radius, height) for round towers: capsule colliders.
+		private static readonly List<Vector4> Cylinders = new List<Vector4>();
+
+		private static void SolidCylinder(Vector3 baseCenter, float r, float height)
+		{
+			Cylinders.Add(new Vector4(baseCenter.x, baseCenter.y, baseCenter.z, r));
+			Cylinders.Add(new Vector4(height, 0f, 0f, 0f));
+		}
+
 		private static void Solid(Vector3 min, Vector3 max)
 		{
 			var b = new Bounds();
@@ -426,7 +436,7 @@ namespace GliderJam.EditorTools
 			b.SetMinMax(min, max);
 			Bridges.Add(b);
 			MB mb = At(core, b.center);
-			mb.Box(min, max, Slot.Glass, Slot.Roof, new Vector2(R(0f, 40f), 0f), true, Slot.Metal);
+			mb.Box(min, max, R() < 0.5f ? Slot.Mirror : Slot.MirrorGold, Slot.Roof, new Vector2(R(0f, 40f), 0f), true, Slot.Metal); // dark underside: chrome right above the neon tubes blew out
 			Solid(min, max);
 			float ny = lightsBelow ? y0 - 0.25f : y1 + 0.25f;
 			Tube(mb, new Vector3(min.x + 9f, ny, min.z + 0.4f), new Vector3(max.x - 9f, ny, min.z + 0.4f), 0.35f, Slot.NeonCyan);
@@ -518,7 +528,7 @@ namespace GliderJam.EditorTools
 					float bx0 = i * Pitch + HalfStreet, bx1 = (i + 1) * Pitch - HalfStreet;
 					float bz0 = j * Pitch + HalfStreet, bz1 = (j + 1) * Pitch - HalfStreet;
 					MB mb = At(core, new Vector3((bx0 + bx1) * 0.5f, 0f, (bz0 + bz1) * 0.5f));
-					mb.Box(new Vector3(bx0, 0f, bz0), new Vector3(bx1, 0.25f, bz1), Slot.Roof, Slot.Roof, Vector2.zero);
+					mb.Box(new Vector3(bx0, 0f, bz0), new Vector3(bx1, 0.25f, bz1), Slot.Roof, Slot.Marble, Vector2.zero);
 					var block = Rect.MinMaxRect(bx0, bz0, bx1, bz1);
 					foreach (Rect lot in SplitLots(Rect.MinMaxRect(bx0 + 4f, bz0 + 4f, bx1 - 4f, bz1 - 4f), NearBridge(block, 14f))) Tower(mb, lot, flicker);
 				}
@@ -563,8 +573,9 @@ namespace GliderJam.EditorTools
 		private static Slot PickStyle(float h)
 		{
 			float r = R();
-			if (h > 150f) return r < 0.32f ? Slot.Glass : r < 0.55f ? Slot.GlassPink : r < 0.8f ? Slot.Office : r < 0.93f ? Slot.Housing : Slot.Dim;
-			return r < 0.14f ? Slot.Glass : r < 0.24f ? Slot.GlassPink : r < 0.42f ? Slot.Office : r < 0.78f ? Slot.Housing : Slot.Dim;
+			// Mirror-glass skyscrapers dominate the skyline; LED-banded glass, offices and hab blocks fill in.
+			if (h > 150f) return r < 0.3f ? Slot.Mirror : r < 0.45f ? Slot.MirrorGold : r < 0.6f ? Slot.Glass : r < 0.71f ? Slot.GlassPink : r < 0.85f ? Slot.Office : r < 0.95f ? Slot.Housing : Slot.Dim;
+			return r < 0.16f ? Slot.Mirror : r < 0.24f ? Slot.MirrorGold : r < 0.33f ? Slot.Glass : r < 0.4f ? Slot.GlassPink : r < 0.56f ? Slot.Office : r < 0.85f ? Slot.Housing : Slot.Dim;
 		}
 
 		private static void Tower(MB mb, Rect lot, MB[] flicker)
@@ -580,11 +591,13 @@ namespace GliderJam.EditorTools
 
 			Slot style = PickStyle(h);
 			var off = new Vector2(_rng.Next(0, 16) * ColW, _rng.Next(0, 32) * FloorH);
-			// Cyberpunk massing: chamfered (octagonal) glass towers, ledged housing blocks, finned curtain walls.
-			bool octagon = h > 90f && style != Slot.Housing && R() < 0.42f;
+			// Cyberpunk massing: round and chamfered (octagonal) glass towers, ledged housing blocks, chrome-finned curtain walls.
+			bool glassy = style == Slot.Glass || style == Slot.GlassPink || style == Slot.Mirror || style == Slot.MirrorGold;
+			bool round = h > 120f && glassy && R() < 0.24f;
+			bool octagon = !round && h > 90f && style != Slot.Housing && R() < 0.4f;
 			float chamferRatio = R(0.14f, 0.24f);
-			bool ledges = !octagon && (style == Slot.Housing || style == Slot.Dim || style == Slot.Office) && R() < 0.6f;
-			bool fins = !octagon && (style == Slot.Glass || style == Slot.GlassPink) && R() < 0.45f;
+			bool ledges = !octagon && !round && (style == Slot.Housing || style == Slot.Dim || style == Slot.Office) && R() < 0.6f;
+			bool fins = !octagon && !round && glassy && R() < 0.35f;
 			float x0 = lot.xMin, x1 = lot.xMax, z0 = lot.yMin, z1 = lot.yMax;
 			var tiers = new List<Bounds>();
 			float y = 0.25f;
@@ -611,6 +624,14 @@ namespace GliderJam.EditorTools
 				Slot s = isPodium ? Slot.Concrete : style;
 				Bounds t = tiers[k];
 				Vector2 o = off + new Vector2(k * 7f * ColW, 0f);
+				if (round && !isPodium)
+				{
+					// Faceted round tower (24 sides) with a capsule collider.
+					float r = Mathf.Min(t.size.x, t.size.z) * 0.5f;
+					mb.Prism(Circle(t, r, 24), t.min.y, t.max.y, s, Slot.Roof, o);
+					SolidCylinder(new Vector3(t.center.x, t.min.y, t.center.z), r, t.size.y);
+					continue;
+				}
 				if (octagon && !isPodium)
 				{
 					float c = Mathf.Min(t.size.x, t.size.z) * chamferRatio;
@@ -619,7 +640,7 @@ namespace GliderJam.EditorTools
 					Solid(new Vector3(t.min.x, t.min.y, t.min.z + c), new Vector3(t.max.x, t.max.y, t.max.z - c));
 					continue;
 				}
-				mb.Box(t.min, t.max, s, Slot.Roof, o);
+				mb.Box(t.min, t.max, s, isPodium ? Slot.Marble : Slot.Roof, o);
 				Solid(t.min, t.max);
 				if (isPodium) continue;
 				if (ledges)
@@ -631,12 +652,13 @@ namespace GliderJam.EditorTools
 			Bounds topTier = tiers[tiers.Count - 1];
 
 			// Glowing glass spire on some of the tallest towers (away from the corner height caps).
-			bool spire = h > 170f && cap > 9000f && (style == Slot.Glass || style == Slot.GlassPink || style == Slot.Office) && R() < 0.4f;
+			bool spire = h > 170f && cap > 9000f && (glassy || style == Slot.Office) && R() < 0.4f;
 			if (spire)
 			{
 				float sh = R(25f, 70f), ins = Mathf.Min(topTier.size.x, topTier.size.z) * 0.18f;
 				Bounds sb = B(topTier.min.x + ins, topTier.max.y, topTier.min.z + ins, topTier.max.x - ins, topTier.max.y + sh, topTier.max.z - ins);
-				mb.Prism(Octagon(sb, Mathf.Min(sb.size.x, sb.size.z) * 0.3f), sb.min.y, sb.max.y, style == Slot.Office ? Slot.GlassPink : style, Slot.Metal, off, 0.12f);
+				Slot spireSkin = R() < 0.5f ? Slot.Chrome : style == Slot.Office ? Slot.GlassPink : style;
+				mb.Prism(Octagon(sb, Mathf.Min(sb.size.x, sb.size.z) * 0.3f), sb.min.y, sb.max.y, spireSkin, Slot.Chrome, off, 0.12f);
 				Solid(sb.min + new Vector3(sb.size.x * 0.25f, 0f, sb.size.z * 0.25f), new Vector3(sb.max.x - sb.size.x * 0.25f, sb.min.y + sh * 0.4f, sb.max.z - sb.size.z * 0.25f));
 			}
 
@@ -665,14 +687,14 @@ namespace GliderJam.EditorTools
 
 			if (dRoute > 320f) return;
 			// Neon: rooftop outline, horizontal rings, podium band, blade signs, billboards.
-			if (!octagon && R() < 0.5f) Ring(mb, topTier.min, topTier.max, topTier.max.y + 0.2f, -0.5f, 0.4f, NeonSlots[_rng.Next(NeonSlots.Length)]);
-			if (!octagon && h > 60f && R() < 0.22f)
+			if (!octagon && !round && R() < 0.5f) Ring(mb, topTier.min, topTier.max, topTier.max.y + 0.2f, -0.5f, 0.4f, NeonSlots[_rng.Next(NeonSlots.Length)]);
+			if (!octagon && !round && h > 60f && R() < 0.22f)
 			{
 				Bounds t = tiers[Mathf.Min(tiers.Count - 1, podium > 0f ? 1 : 0)];
 				Ring(mb, t.min, t.max, Mathf.Lerp(t.min.y, t.max.y, R(0.3f, 0.9f)), 0.3f, 0.45f, NeonSlots[_rng.Next(NeonSlots.Length)]);
 			}
 			if (podium > 0f && R() < 0.6f) Ring(mb, tiers[0].min, tiers[0].max, podium - 1.5f, 0.3f, 0.5f, NeonSlots[_rng.Next(NeonSlots.Length)]);
-			if (!octagon && h > 100f && R() < 0.25f)
+			if (!octagon && !round && h > 100f && R() < 0.25f)
 			{
 				// Vertical light strips up two opposite corners of the main tier.
 				Bounds t = tiers[podium > 0f ? 1 : 0];
@@ -687,7 +709,7 @@ namespace GliderJam.EditorTools
 			Vector3 n = Mathf.Abs(toRoute.x) > Mathf.Abs(toRoute.z) ? new Vector3(Mathf.Sign(toRoute.x), 0f, 0f) : new Vector3(0f, 0f, Mathf.Sign(toRoute.z));
 			Vector3 along = Vector3.Cross(Vector3.up, n);
 			// Flat part of the face (chamfered towers lose the corners).
-			float faceHalf = Mathf.Abs(Vector3.Dot(main.extents, along)) - (octagon ? Mathf.Min(main.size.x, main.size.z) * chamferRatio : 0f);
+			float faceHalf = round ? 0f : Mathf.Abs(Vector3.Dot(main.extents, along)) - (octagon ? Mathf.Min(main.size.x, main.size.z) * chamferRatio : 0f);
 			Vector3 faceCenter = new Vector3(main.center.x, 0f, main.center.z) + n * Mathf.Abs(Vector3.Dot(main.extents, n));
 			float signSide = R() < 0.5f ? -1f : 1f;
 			if (dRoute < 220f && faceHalf > 6f && R() < 0.6f)
@@ -745,6 +767,17 @@ namespace GliderJam.EditorTools
 			}
 		}
 
+		private static Vector2[] Circle(Bounds t, float r, int seg)
+		{
+			var p = new Vector2[seg];
+			for (int i = 0; i < seg; i++)
+			{
+				float a = i * Mathf.PI * 2f / seg;
+				p[i] = new Vector2(t.center.x + Mathf.Cos(a) * r, t.center.z + Mathf.Sin(a) * r);
+			}
+			return p;
+		}
+
 		private static Vector2[] Octagon(Bounds t, float c)
 		{
 			float x0 = t.min.x, x1 = t.max.x, z0 = t.min.z, z1 = t.max.z;
@@ -772,13 +805,13 @@ namespace GliderJam.EditorTools
 			float y0 = t.min.y + 1f, y1 = t.max.y - 0.5f;
 			for (float x = t.min.x + 3f; x < t.max.x - 2f; x += step)
 			{
-				mb.Box(new Vector3(x - th * 0.5f, y0, t.min.z - d), new Vector3(x + th * 0.5f, y1, t.min.z), Slot.Metal, Slot.Metal, Vector2.zero);
-				mb.Box(new Vector3(x - th * 0.5f, y0, t.max.z), new Vector3(x + th * 0.5f, y1, t.max.z + d), Slot.Metal, Slot.Metal, Vector2.zero);
+				mb.Box(new Vector3(x - th * 0.5f, y0, t.min.z - d), new Vector3(x + th * 0.5f, y1, t.min.z), Slot.Chrome, Slot.Chrome, Vector2.zero);
+				mb.Box(new Vector3(x - th * 0.5f, y0, t.max.z), new Vector3(x + th * 0.5f, y1, t.max.z + d), Slot.Chrome, Slot.Chrome, Vector2.zero);
 			}
 			for (float z = t.min.z + 3f; z < t.max.z - 2f; z += step)
 			{
-				mb.Box(new Vector3(t.min.x - d, y0, z - th * 0.5f), new Vector3(t.min.x, y1, z + th * 0.5f), Slot.Metal, Slot.Metal, Vector2.zero);
-				mb.Box(new Vector3(t.max.x, y0, z - th * 0.5f), new Vector3(t.max.x + d, y1, z + th * 0.5f), Slot.Metal, Slot.Metal, Vector2.zero);
+				mb.Box(new Vector3(t.min.x - d, y0, z - th * 0.5f), new Vector3(t.min.x, y1, z + th * 0.5f), Slot.Chrome, Slot.Chrome, Vector2.zero);
+				mb.Box(new Vector3(t.max.x, y0, z - th * 0.5f), new Vector3(t.max.x + d, y1, z + th * 0.5f), Slot.Chrome, Slot.Chrome, Vector2.zero);
 			}
 		}
 
@@ -1127,6 +1160,18 @@ namespace GliderJam.EditorTools
 					bc.size = b.size;
 				}
 			}
+			var round = new GameObject("Round Towers");
+			round.transform.SetParent(root, false);
+			for (int i = 0; i + 1 < Cylinders.Count; i += 2)
+			{
+				Vector4 c = Cylinders[i];
+				float hgt = Cylinders[i + 1].x;
+				var cap = round.AddComponent<CapsuleCollider>();
+				cap.direction = 1;
+				cap.radius = c.w;
+				cap.height = hgt; // rounded ends stay inside the tower (no invisible dome above the roof)
+				cap.center = new Vector3(c.x, c.y + hgt * 0.5f, c.z);
+			}
 			var ground = new GameObject("Ground and Water");
 			ground.transform.SetParent(root, false);
 			var g = ground.AddComponent<BoxCollider>();
@@ -1200,9 +1245,9 @@ namespace GliderJam.EditorTools
 			AtmosphereSetup.P(env, "skyType", (int)SkyType.Gradient);
 			AtmosphereSetup.P(env, "skyAmbientMode", SkyAmbientMode.Dynamic);
 			var sky = AtmosphereSetup.Get<GradientSky>(profile);
-			AtmosphereSetup.P(sky, "top", new Color(0.06f, 0.08f, 0.2f));
-			AtmosphereSetup.P(sky, "middle", new Color(0.55f, 0.32f, 0.85f));
-			AtmosphereSetup.P(sky, "bottom", new Color(3.2f, 1.35f, 1.7f));
+			AtmosphereSetup.P(sky, "top", new Color(0.09f, 0.11f, 0.3f));
+			AtmosphereSetup.P(sky, "middle", new Color(0.85f, 0.45f, 1.25f)); // mirror towers reflect this city glow
+			AtmosphereSetup.P(sky, "bottom", new Color(3.8f, 1.6f, 2.1f));
 			AtmosphereSetup.P(sky, "gradientDiffusion", 2.4f);
 			AtmosphereSetup.P(sky, "multiplier", 1f);
 			var clouds = AtmosphereSetup.Get<VolumetricClouds>(profile);
@@ -1220,7 +1265,7 @@ namespace GliderJam.EditorTools
 			AtmosphereSetup.P(fog, "globalLightProbeDimmer", 1f);
 			var exposure = AtmosphereSetup.Get<Exposure>(profile);
 			AtmosphereSetup.P(exposure, "mode", ExposureMode.Fixed);
-			AtmosphereSetup.P(exposure, "fixedExposure", 3.3f);
+			AtmosphereSetup.P(exposure, "fixedExposure", 3.0f);
 			var tone = AtmosphereSetup.Get<Tonemapping>(profile);
 			AtmosphereSetup.P(tone, "mode", TonemappingMode.ACES);
 			var bloom = AtmosphereSetup.Get<Bloom>(profile);
@@ -1310,6 +1355,7 @@ namespace GliderJam.EditorTools
 			public int frame, spandrel, split;   // mullion px, spandrel px, windows per 4 m bay
 			public Color glass, frameColor;
 			public float glassSmooth, glassMetal, frameSmooth, frameMetal, lit, grime;
+			public float paneTilt;               // per-pane normal tilt (mirror glass 'oil-canning')
 			public bool bands;                   // ribbon windows (offices)
 			public int ledEvery;                 // LED light band every n floors (0 = none)
 			public Color led;
@@ -1336,6 +1382,11 @@ namespace GliderJam.EditorTools
 				frameColor = new Color(0.13f, 0.13f, 0.14f), frameMetal = 0.2f, frameSmooth = 0.5f, lit = 0.05f, grime = 0.4f, palette = new[] { Warm, Neutral } }, 53);
 			m[(int)Slot.Office] = Facade("Office", new FacadeStyle { frame = 2, spandrel = 16, split = 1, glass = new Color(0.12f, 0.15f, 0.19f), glassMetal = 0.75f, glassSmooth = 0.95f,
 				frameColor = new Color(0.05f, 0.055f, 0.06f), frameMetal = 0.5f, frameSmooth = 0.55f, lit = 0.45f, bands = true, ledEvery = 8, led = new Color(0.6f, 0.9f, 1f), palette = new[] { Neutral, Cool } }, 37);
+			// Mirror-glass skyscrapers: coated reflective panes on a fine mullion grid, a few offices lit behind the glass.
+			m[(int)Slot.Mirror] = Facade("Mirror", new FacadeStyle { frame = 2, spandrel = 7, split = 2, glass = new Color(0.48f, 0.52f, 0.58f), glassMetal = 1f, glassSmooth = 0.985f,
+				frameColor = new Color(0.2f, 0.21f, 0.23f), frameMetal = 0.9f, frameSmooth = 0.82f, lit = 0.08f, paneTilt = 0.035f, ledEvery = 10, led = new Color(0.75f, 0.9f, 1f), palette = new[] { Cool, Neutral } }, 83);
+			m[(int)Slot.MirrorGold] = Facade("MirrorGold", new FacadeStyle { frame = 2, spandrel = 7, split = 2, glass = new Color(0.62f, 0.48f, 0.28f), glassMetal = 1f, glassSmooth = 0.985f,
+				frameColor = new Color(0.22f, 0.18f, 0.12f), frameMetal = 0.9f, frameSmooth = 0.82f, lit = 0.08f, paneTilt = 0.03f, ledEvery = 12, led = new Color(1f, 0.65f, 0.25f), palette = new[] { Warm, Neutral } }, 89);
 
 			const int RS = 512;
 			var rb = new Color[RS * RS];
@@ -1364,10 +1415,10 @@ namespace GliderJam.EditorTools
 					float u = x / (float)AS, v = y / (float)AS;
 					float grain = TileFbm(u, v, 256, 2, 7);
 					float patch = TileFbm(u, v, 6, 3, 9);
-					float puddle = WorldNoise.SmoothStep(0.55f, 0.64f, TileFbm(u, v, 5, 4, 13));
+					float puddle = WorldNoise.SmoothStep(0.47f, 0.57f, TileFbm(u, v, 5, 4, 13));
 					float g = Mathf.Lerp(0.028f, 0.06f, grain) * Mathf.Lerp(0.8f, 1.2f, patch) * Mathf.Lerp(1f, 0.6f, puddle);
 					ab[y * AS + x] = new Color(g, g, g * 1.05f);
-					am[y * AS + x] = new Color(0f, 1f, 0f, Mathf.Lerp(0.55f + 0.12f * patch, 0.97f, puddle));
+					am[y * AS + x] = new Color(0f, 1f, 0f, Mathf.Lerp(0.68f + 0.1f * patch, 0.98f, puddle)); // rain-soaked
 					ah[y * AS + x] = grain * (1f - puddle);
 				}
 			}
@@ -1383,6 +1434,8 @@ namespace GliderJam.EditorTools
 
 			m[(int)Slot.Marking] = Lit("City_Marking", new Color(0.6f, 0.58f, 0.48f), null, null, null, 0.78f, 0f, null, Color.black);
 			m[(int)Slot.Metal] = Lit("City_Metal", new Color(0.05f, 0.05f, 0.055f), null, null, null, 0.55f, 0.85f, null, Color.black);
+			m[(int)Slot.Chrome] = Lit("City_Chrome", new Color(0.78f, 0.79f, 0.82f), null, null, null, 0.94f, 1f, null, Color.black);
+			m[(int)Slot.Marble] = Marble();
 			m[(int)Slot.Lamp] = Lit("City_Lamp", new Color(1f, 0.85f, 0.6f), null, null, null, 0.5f, 0f, null, new Color(1f, 0.72f, 0.42f) * 3000f);
 			for (int k = 0; k < NeonSlots.Length; k++)
 			{
@@ -1412,6 +1465,31 @@ namespace GliderJam.EditorTools
 			return m;
 		}
 
+		// Polished dark stone slabs (2 m) with pale veins and grout lines, wet-smooth: plazas and sidewalks.
+		private static Material Marble()
+		{
+			const int S = 1024, slabs = 12;
+			var bc = new Color[S * S];
+			var mk = new Color[S * S];
+			var ht = new float[S * S];
+			for (int y = 0; y < S; y++)
+			{
+				for (int x = 0; x < S; x++)
+				{
+					float u = x / (float)S, v = y / (float)S;
+					float gu = Mathf.Abs(Mathf.Repeat(u * slabs, 1f) - 0.5f), gv = Mathf.Abs(Mathf.Repeat(v * slabs, 1f) - 0.5f);
+					bool grout = gu > 0.485f || gv > 0.485f;
+					float tint = 0.85f + 0.3f * WorldNoise.Hash(Mathf.FloorToInt(u * slabs), Mathf.FloorToInt(v * slabs), 61);
+					float vein = WorldNoise.SmoothStep(0.94f, 0.995f, 1f - Mathf.Abs(TileFbm(u, v, 6, 4, 67) * 2f - 1f));
+					Color c = Color.Lerp(new Color(0.028f, 0.028f, 0.034f) * tint, new Color(0.15f, 0.15f, 0.16f), vein * 0.8f);
+					bc[y * S + x] = grout ? new Color(0.01f, 0.01f, 0.012f) : c;
+					mk[y * S + x] = new Color(0f, 1f, 0f, grout ? 0.45f : 0.93f);
+					ht[y * S + x] = grout ? 0f : 1f;
+				}
+			}
+			return Lit("City_Marble", Color.white, SaveTex("Marble_Base", S, S, bc, false), SaveTex("Marble_Mask", S, S, mk, true), NormalTex("Marble_Normal", S, ht, 1.2f), 1f, 0f, null, Color.black);
+		}
+
 		private static Material Facade(string name, FacadeStyle s, int seed)
 		{
 			int w = TileCols * CellPx, h = TileFloors * FloorPx;
@@ -1419,8 +1497,10 @@ namespace GliderJam.EditorTools
 			var mask = new Color[w * h];
 			var emis = new Color[w * h];
 			var height = new float[w * h];
+			var tiltX = new float[w * h];
+			var tiltY = new float[w * h];
 			int split = Mathf.Max(1, s.split), bay = CellPx / split;
-			const float windowGlow = 0.18f; // interior light relative to the LED bands (emissive map is LDR)
+			const float windowGlow = 0.15f; // interior light relative to the LED bands (emissive map is LDR)
 			for (int fl = 0; fl < TileFloors; fl++)
 			{
 				float mood = WorldNoise.Hash(fl, seed, 3);
@@ -1465,12 +1545,21 @@ namespace GliderJam.EditorTools
 							baseC[i] = s.glass;
 							mask[i] = new Color(s.glassMetal, 1f, 0f, s.glassSmooth);
 							height[i] = 0f;
+							if (s.paneTilt > 0f)
+							{
+								// Each pane sits a touch off-plane and bows slightly, so reflections ripple from pane to pane.
+								tiltX[i] = (WorldNoise.Hash(win, fl, seed + 41) - 0.5f) * 2f * s.paneTilt + (wx - 0.5f) * s.paneTilt * 0.8f;
+								tiltY[i] = (WorldNoise.Hash(win, fl, seed + 43) - 0.5f) * 2f * s.paneTilt + (wy - 0.5f) * s.paneTilt * 0.8f;
+							}
 							if (!lit)
 							{
 								emis[i] = Color.black;
 								continue;
 							}
-							float g = Mathf.Lerp(0.7f, 1f, wy);
+							// A lit room: brighter towards the ceiling, a ceiling light strip, furniture silhouettes low down.
+							float g = Mathf.Lerp(0.55f, 1f, wy);
+							if (wy > 0.86f) g *= 1.35f;
+							if (wy < 0.32f && WorldNoise.Hash((int)(wx * 7f) + win * 13, fl, seed + 31) < 0.4f) g *= 0.3f;
 							if (blinds && py % 4 == 0) g *= 0.35f;
 							if (cover > 0f && wx < cover) g *= 0.25f;
 							emis[i] = light * (bright * g * windowGlow);
@@ -1481,12 +1570,12 @@ namespace GliderJam.EditorTools
 			Texture2D bm = SaveTex("Facade_" + name + "_Base", w, h, baseC, false);
 			Texture2D mm = SaveTex("Facade_" + name + "_Mask", w, h, mask, true);
 			Texture2D em = SaveTex("Facade_" + name + "_Emissive", w, h, emis, false);
-			Texture2D nm = NormalTexRect("Facade_" + name + "_Normal", w, h, height, 1.5f);
-			return Lit("City_Facade_" + name, Color.white, bm, mm, nm, 1f, 0f, em, Color.white * 60f);
+			Texture2D nm = NormalTexRect("Facade_" + name + "_Normal", w, h, height, 1.5f, tiltX, tiltY);
+			return Lit("City_Facade_" + name, Color.white, bm, mm, nm, 1f, 0f, em, Color.white * 85f);
 		}
 
 		// Normal map from a height field of any size (wrapping).
-		private static Texture2D NormalTexRect(string name, int w, int h, float[] height, float strength)
+		private static Texture2D NormalTexRect(string name, int w, int h, float[] height, float strength, float[] offX = null, float[] offY = null)
 		{
 			var px = new Color[w * h];
 			for (int y = 0; y < h; y++)
@@ -1495,7 +1584,7 @@ namespace GliderJam.EditorTools
 				{
 					float dx = (height[y * w + (x + 1) % w] - height[y * w + (x - 1 + w) % w]) * strength;
 					float dy = (height[((y + 1) % h) * w + x] - height[((y - 1 + h) % h) * w + x]) * strength;
-					Vector3 n = new Vector3(-dx, -dy, 1f).normalized;
+					Vector3 n = new Vector3(-dx + (offX != null ? offX[y * w + x] : 0f), -dy + (offY != null ? offY[y * w + x] : 0f), 1f).normalized;
 					px[y * w + x] = new Color(n.x * 0.5f + 0.5f, n.y * 0.5f + 0.5f, n.z * 0.5f + 0.5f, 1f);
 				}
 			}

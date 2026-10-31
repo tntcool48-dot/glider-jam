@@ -37,6 +37,24 @@ namespace GliderJam.EditorTools
 				Bool(so, "m_RenderPipelineSettings.supportMotionVectors", true);
 				bool rt = path == RtAsset;
 				Bool(so, "m_RenderPipelineSettings.supportRayTracing", rt);
+				if (rt)
+				{
+					// Top tier (index 2, used by the Ultra + Ray Tracing preset) tuned to show the reflections off:
+					// full resolution, long rays, down to wet-asphalt smoothness, gentle denoising.
+					const string q = "m_RenderPipelineSettings.lightingQualitySettings.";
+					Tier(so, q + "RTRMinSmoothness", 0.45f);
+					Tier(so, q + "RTRSmoothnessFadeStart", 0.55f);
+					Tier(so, q + "RTRRayLength", 2000f);
+					Tier(so, q + "RTRFullResolution", true);
+					Tier(so, q + "RTRRayMaxIterations", 64);
+					Tier(so, q + "RTRDenoise", true);
+					Tier(so, q + "RTRDenoiserRadiusDimmer", 0.6f);
+					Tier(so, q + "RTRDenoiserAntiFlicker", 1f);
+					Tier(so, q + "RTGIRayLength", 300f);
+					Tier(so, q + "RTGIDenoise", true);
+					Tier(so, q + "RTAORayLength", 4f);
+					Tier(so, q + "RTAOSampleCount", 2);
+				}
 				so.ApplyModifiedPropertiesWithoutUndo();
 				EditorUtility.SetDirty(asset);
 			}
@@ -75,6 +93,17 @@ namespace GliderJam.EditorTools
 			SerializedProperty p = so.FindProperty(path);
 			if (p == null) { Report.Add(path); return; }
 			p.boolValue = v;
+		}
+
+		// Sets the High entry (index 2) of a per-quality-tier array.
+		private static void Tier(SerializedObject so, string path, object v)
+		{
+			SerializedProperty p = so.FindProperty(path);
+			if (p == null || !p.isArray || p.arraySize < 3) { Report.Add(path); return; }
+			SerializedProperty e = p.GetArrayElementAtIndex(2);
+			if (v is bool b) e.boolValue = b;
+			else if (v is int i) e.intValue = i;
+			else e.floatValue = (float)v;
 		}
 
 		private static void Float(SerializedObject so, string path, float v)
