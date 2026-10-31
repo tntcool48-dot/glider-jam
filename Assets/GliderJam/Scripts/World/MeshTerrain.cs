@@ -381,7 +381,10 @@ namespace GliderJam.World
 				mr.sharedMaterial = material;
 				// The surrounding landscape is beyond the shadow range of the course: no shadow casting.
 				mr.shadowCastingMode = job.corridor ? UnityEngine.Rendering.ShadowCastingMode.On : UnityEngine.Rendering.ShadowCastingMode.Off;
-				mr.rayTracingMode = UnityEngine.Experimental.Rendering.RayTracingMode.Static;
+				// One LOD per chunk in the ray tracing scene (overlapping LODs triple the instances and slow traversal):
+				// full detail along the course, the coarsest level for the surrounding landscape.
+				bool traced = job.corridor ? l == 0 : l == 2;
+				mr.rayTracingMode = traced ? UnityEngine.Experimental.Rendering.RayTracingMode.Static : UnityEngine.Experimental.Rendering.RayTracingMode.Off;
 				lods[l] = new LOD(thresholds[l], new Renderer[] { mr });
 			}
 			lodGroup.SetLODs(lods);

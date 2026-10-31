@@ -110,7 +110,8 @@ namespace GliderJam
 					antiAliasing = 3; textureQuality = 2; vegetation = 3; terrainDetail = 3; backdrop = 2; water = 1; effects = 2;
 					motionBlur = true; filmGrain = true; renderScale = 100; break;
 				case QualityPreset.UltraRayTracing:
-					shadows = 4; clouds = 3; fog = 3; ambientOcclusion = 2; reflections = 2; globalIllumination = 2;
+					// Ray traced reflections only: RT AO / GI cost most and change least (still selectable under Custom).
+					shadows = 4; clouds = 3; fog = 3; ambientOcclusion = 1; reflections = 2; globalIllumination = 1;
 					antiAliasing = 3; textureQuality = 2; vegetation = 3; terrainDetail = 3; backdrop = 2; water = 1; effects = 2;
 					motionBlur = true; filmGrain = true; renderScale = 100; break;
 			}

@@ -52283,7 +52283,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: -0, y: -0, z: -0}
+    textureOffset: {x: 0, y: 0, z: 0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}
@@ -52368,7 +52368,6 @@ MonoBehaviour:
   fx: {fileID: 11400000, guid: 3677191c0244b694796ac94cb9a4fa3a, type: 2}
   route: {fileID: 1068896186}
   countdownSeconds: 3
-  missedPenalty: 3
   respawnDelay: 2.2
   resultsDelay: 4.5
   autopilot: 0000
@@ -52452,7 +52451,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: -0, y: -0, z: -0}
+    textureOffset: {x: 0, y: 0, z: 0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}
@@ -52521,7 +52520,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: -0, y: -0, z: -0}
+    textureOffset: {x: 0, y: 0, z: 0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}
@@ -52979,6 +52978,8 @@ MonoBehaviour:
   checkpointRadius: 42
   finishRadius: 70
   ceiling: 288
+  minX: 15
+  maxX: 985
 --- !u!4 &1068896187
 Transform:
   m_ObjectHideFlags: 0
@@ -53059,7 +53060,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: -0, y: -0, z: -0}
+    textureOffset: {x: 0, y: 0, z: 0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}
@@ -53128,7 +53129,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: -0, y: -0, z: -0}
+    textureOffset: {x: 0, y: 0, z: 0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}
@@ -53250,7 +53251,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: -0, y: -0, z: -0}
+    textureOffset: {x: 0, y: 0, z: 0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}
@@ -53711,7 +53712,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: -0, y: -0, z: -0}
+    textureOffset: {x: 0, y: 0, z: 0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}
@@ -53780,7 +53781,7 @@ MonoBehaviour:
     invertFade: 0
     distanceFadeStart: 9000
     distanceFadeEnd: 12000
-    textureOffset: {x: -0, y: -0, z: -0}
+    textureOffset: {x: 0, y: 0, z: 0}
     falloffMode: 0
     maskMode: 0
     materialMask: {fileID: 0}

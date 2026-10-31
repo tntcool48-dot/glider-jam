@@ -114,6 +114,8 @@ namespace GliderJam.EditorTools
 			rr.checkpointRadius = 24f;
 			rr.finishRadius = 34f;
 			rr.ceiling = Ceiling;
+			rr.minX = CoreI0 * Pitch; // the skyline beyond the core blocks has no collision
+			rr.maxX = (CoreI1 + 1) * Pitch;
 			var rm = new GameObject("Race Manager").AddComponent<RaceManager>();
 			rm.fx = AssetDatabase.LoadAssetAtPath<FxLibrary>(FxBuilder.LibraryPath);
 			rm.route = rr;

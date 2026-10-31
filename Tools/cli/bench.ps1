@@ -21,6 +21,9 @@ foreach ($kv in $Set) { $a += @("-set", $kv) }
 # A new player started while the previous one is still shutting down can hang at load.
 Get-Process GliderJam -ErrorAction SilentlyContinue | ForEach-Object { if (-not $_.WaitForExit(20000)) { $_.Kill() } }
 Start-Sleep -Seconds 3
-$p = Start-Process -FilePath $exe -ArgumentList $a -PassThru
-if (-not $p.WaitForExit(($Seconds + 120) * 1000)) { $p.Kill(); "timed out" }
+for ($try = 1; $try -le 2 -and -not (Test-Path $log); $try++) {
+    # The player occasionally hangs right after loading (rare, canyon only): kill it and try once more.
+    $p = Start-Process -FilePath $exe -ArgumentList $a -PassThru
+    if (-not $p.WaitForExit(($Seconds + 120) * 1000)) { $p.Kill(); "timed out (attempt $try)"; Start-Sleep -Seconds 5 }
+}
 if (Test-Path $log) { Get-Content $log } else { "no log written" }

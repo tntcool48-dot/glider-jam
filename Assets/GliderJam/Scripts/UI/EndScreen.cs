@@ -25,7 +25,6 @@ namespace GliderJam.UI
 				Label("FINISHED", 110f, new Vector2(120f, -170f), GameSettings.PlayerColors[0], FontStyles.Bold | FontStyles.Italic);
 				Label(GameSettings.FormatTime(t), 72f, new Vector2(126f, -320f), Color.white, FontStyles.Bold);
 				Label(record ? "NEW BEST TIME" : "Best  " + GameSettings.FormatTime(GameSettings.BestSoloTime), 30f, new Vector2(126f, -420f), new Color(1f, 0.85f, 0.5f));
-				Label(Missed(0), 26f, new Vector2(126f, -470f), new Color(1f, 1f, 1f, 0.7f), FontStyles.Normal);
 			}
 			else
 			{
@@ -35,18 +34,12 @@ namespace GliderJam.UI
 				{
 					string time = GameSettings.Finished[i] ? GameSettings.FormatTime(GameSettings.FinishTimes[i]) : "DNF";
 					string tag = "<color=#" + ColorUtility.ToHtmlStringRGB(GameSettings.PlayerColors[i]) + ">" + GameSettings.PlayerNames[i] + "</color>";
-					Label(tag + "    " + time + "    <size=70%>" + Missed(i) + "</size>", 40f, new Vector2(126f, -330f - i * 64f), Color.white, FontStyles.Bold, 1600f);
+					Label(tag + "    " + time, 40f, new Vector2(126f, -330f - i * 64f), Color.white, FontStyles.Bold, 1600f);
 				}
 			}
 			Label(GameSettings.MapName, 26f, new Vector2(126f, -268f), UiKit.Gold, FontStyles.Bold);
 			MakeButton("RESTART", new Vector2(120f, -620f), w >= 0 ? GameSettings.PlayerColors[w] : GameSettings.PlayerColors[0], () => Load(GameSettings.Map));
 			MakeButton("MAIN MENU", new Vector2(120f, -720f), new Color(0.5f, 0.55f, 0.6f), () => Load(GameSettings.MenuScene));
 		}
-
-		private static string Missed(int i)
-		{
-			int m = GameSettings.MissedCheckpoints[i];
-			return m == 0 ? "all checkpoints" : m + " missed checkpoint" + (m > 1 ? "s" : "") + " (+" + (m * 3) + " s)";
-		}
-	}
+}
 }

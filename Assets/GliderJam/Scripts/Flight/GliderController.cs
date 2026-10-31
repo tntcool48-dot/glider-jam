@@ -32,6 +32,8 @@ namespace GliderJam.Flight
 		[Header("Out of bounds")]
 		public float ceiling = 288f;
 		public float ceilingGrace = 2f;
+		// Course limits (x sides, z behind the start): outside them counts like the ceiling.
+		public float minX = float.NegativeInfinity, maxX = float.PositiveInfinity, minZ = float.NegativeInfinity;
 
 		// Inputs (set by the driver)
 		[NonSerialized] public float inputPitch, inputTurn;
@@ -50,6 +52,8 @@ namespace GliderJam.Flight
 		public float OutOfBoundsTime { get; private set; }
 		public float OutOfBoundsLeft => Mathf.Max(0f, ceilingGrace - OutOfBoundsTime);
 		public bool OutOfBounds => OutOfBoundsTime > 0f;
+		public bool AboveCeiling { get; private set; }
+		public Vector3 Velocity => _rb != null ? _rb.linearVelocity : Vector3.zero;
 		public float SpeedNormalized => Mathf.InverseLerp(brakeSpeed, boostSpeed, Speed);
 		public float Load => Mathf.Abs(Roll) / maxRoll * 0.6f + Mathf.Abs(inputPitch) * 0.5f;
 
@@ -113,8 +117,10 @@ namespace GliderJam.Flight
 			_rb.MoveRotation(rot);
 			_rb.linearVelocity = Vector3.Lerp(_rb.linearVelocity, rot * Vector3.forward * Speed, 1f - Mathf.Exp(-20f * dt));
 
-			// Above the ceiling: short countdown, then the glider is destroyed.
-			if (_rb.position.y > ceiling && Ghost <= 0f)
+			// Above the ceiling or off the course: short countdown, then the glider is destroyed.
+			Vector3 at = _rb.position;
+			AboveCeiling = at.y > ceiling;
+			if ((AboveCeiling || at.x < minX || at.x > maxX || at.z < minZ) && Ghost <= 0f)
 			{
 				OutOfBoundsTime += dt;
 				if (OutOfBoundsTime >= ceilingGrace) Crash(_rb.position);

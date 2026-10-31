@@ -17,7 +17,6 @@ namespace GliderJam.Race
 		public FxLibrary fx;
 		public RaceRoute route;
 		public float countdownSeconds = 3f;
-		public float missedPenalty = 3f;
 		public float respawnDelay = 2.2f;
 		public float resultsDelay = 4.5f;
 		[Tooltip("Debug / tests: let the autopilot fly these players.")]
@@ -29,10 +28,7 @@ namespace GliderJam.Race
 			public GliderVisuals visuals;
 			public FollowCamera cam;
 			public PlayerHUD hud;
-			public int nextCp;
-			public int pathHint;
 			public float progress;
-			public int missed;
 			public bool finished;
 			public float finishTime;
 			public float respawnAt = -1f;
@@ -40,6 +36,8 @@ namespace GliderJam.Race
 			public Volume boostVolume;
 			public float rumbleUntil;
 			public float nextAlarm;
+			public float wrongWay;
+			public Vector3 crashPoint;
 		}
 
 		private readonly List<Player> _players = new List<Player>();
@@ -48,7 +46,6 @@ namespace GliderJam.Race
 		private int _lastCountdown = -1;
 		private int _winner = -1;
 		private float _endAt = -1f;
-		private readonly List<Transform> _rings = new List<Transform>();
 
 		private bool _showcase;
 		private readonly List<GliderController> _showcaseGliders = new List<GliderController>();
@@ -91,6 +88,9 @@ namespace GliderJam.Race
 				p.glider = go.AddComponent<GliderController>();
 				p.glider.PlayerIndex = i;
 				p.glider.ceiling = route.ceiling;
+				p.glider.minX = route.minX;
+				p.glider.maxX = route.maxX;
+				p.glider.minZ = route.MinZ;
 				p.glider.OnCrash += HandleCrash;
 				p.visuals = go.AddComponent<GliderVisuals>();
 				p.visuals.trailMaterial = fx.trail;
@@ -137,7 +137,6 @@ namespace GliderJam.Race
 
 				p.hud = new GameObject("HUD P" + (i + 1)).AddComponent<PlayerHUD>();
 				p.hud.Init(canvas, cam, i, count, vp);
-				p.hud.SetRoute(route, i, count);
 				p.prevPos = pos;
 				p.glider.Frozen = true;
 				_players.Add(p);
@@ -150,7 +149,7 @@ namespace GliderJam.Race
 						Physics.IgnoreCollision(a, b);
 			}
 			_cams = cams.ToArray();
-			BuildRings();
+			BuildFinishLine();
 			_countdownEnd = Time.time + countdownSeconds + 1f;
 			_pause = new GameObject("Pause Menu").AddComponent<PauseMenu>();
 		}
@@ -205,33 +204,30 @@ namespace GliderJam.Race
 				}
 			}
 
+			float finishZ = route.FinishZ;
 			for (int i = 0; i < _players.Count; i++)
 			{
 				Player p = _players[i];
 				Vector3 pos = p.glider.transform.position;
-				if (Running && !p.finished && !p.glider.Crashed)
+				// Free route: the race is won by crossing the finish line anywhere across the course.
+				if (Running && !p.finished && !p.glider.Crashed && p.prevPos.z < finishZ && pos.z >= finishZ)
 				{
-					CheckCheckpoint(i, p, p.prevPos, pos);
+					Finish(i, p);
 				}
 				p.prevPos = pos;
 				if (p.respawnAt > 0f && Time.time >= p.respawnAt)
 				{
 					Respawn(p);
 				}
-				p.pathHint = route.ClosestIndex(pos, p.pathHint, 25);
-				// Continuous progress: checkpoint count, then path sample, then position along the local tangent.
-				int h = Mathf.Min(p.pathHint, route.path.Length - 2);
-				Vector3 tangent = route.path[h + 1] - route.path[h];
-				float along = Vector3.Dot(pos - route.path[h], tangent.normalized) / Mathf.Max(1f, tangent.magnitude);
-				p.progress = p.finished ? 1e6f - p.finishTime : p.nextCp * 10000f + h + along;
+				p.progress = p.finished ? 1e6f - p.finishTime : pos.z;
 				float speed = p.glider.Crashed ? 0f : p.glider.Speed;
-				float time = p.finished ? p.finishTime : RaceTime + p.missed * missedPenalty;
-				p.hud.SetStats(Rank(i), Mathf.Min(p.nextCp, route.CheckpointCount), route.CheckpointCount, time, speed, p.glider.BoostEnergy);
+				float time = p.finished ? p.finishTime : RaceTime;
+				float toGo = Mathf.Max(0f, finishZ - pos.z);
+				p.hud.SetStats(Rank(i), toGo, time, speed, p.glider.BoostEnergy);
 
-				int next = Mathf.Min(p.nextCp, route.CheckpointCount - 1);
-				Vector3 cp = route.CheckpointPosition(next);
-				bool showNext = !p.finished;
-				p.hud.UpdateNext(cp, Mathf.RoundToInt(Vector3.Distance(pos, cp)) + " m", showNext);
+				// The finish line straight ahead, at the glider's own side position and height.
+				var goal = new Vector3(Mathf.Clamp(pos.x, route.minX, route.maxX), pos.y, finishZ);
+				p.hud.UpdateNext(goal, "FINISH  " + Distance(toGo), !p.finished);
 				if (_players.Count == 2)
 				{
 					Player o = _players[1 - i];
@@ -239,13 +235,26 @@ namespace GliderJam.Race
 					string label = "P" + (2 - i) + "  " + Mathf.RoundToInt(Vector3.Distance(pos, op)) + " m";
 					p.hud.UpdateOther(op, label, !o.glider.Crashed);
 				}
-				Vector3 otherPos = _players.Count == 2 ? _players[1 - i].glider.transform.position : pos;
-				p.hud.UpdateMap(pos, p.glider.Yaw, otherPos, _players.Count == 2 && !_players[1 - i].glider.Crashed, cp);
 
-				// Above the ceiling: warning + alarm, countdown to destruction.
+				// Wrong way: heading back towards the start. Warn, then turn the glider around.
+				Vector3 v = Vector3.ProjectOnPlane(p.glider.Velocity, Vector3.up);
+				bool backwards = Running && !p.finished && !p.glider.Crashed && v.sqrMagnitude > 100f && v.normalized.z < -0.25f;
+				p.wrongWay = backwards ? p.wrongWay + Time.deltaTime : Mathf.Max(0f, p.wrongWay - 2f * Time.deltaTime);
+				bool wrong = p.wrongWay > WrongWayWarn;
+				if (p.wrongWay > WrongWayWarn + WrongWayGrace) TurnAround(p);
+
+				// Above the ceiling / off the course: warning + alarm, countdown to destruction.
 				bool oob = p.glider.OutOfBounds && !p.glider.Crashed;
-				p.hud.SetOutOfBounds(oob, p.glider.OutOfBoundsLeft, p.glider.ceilingGrace);
-				if (oob && Time.time >= p.nextAlarm)
+				if (oob)
+				{
+					bool ceiling = p.glider.AboveCeiling;
+					p.hud.SetWarning(true, ceiling ? "PULL DOWN" : "OFF COURSE", ceiling ? "RETURN BELOW THE CLOUDS" : "HEAD BACK INTO THE COURSE", p.glider.OutOfBoundsLeft, p.glider.ceilingGrace);
+				}
+				else
+				{
+					p.hud.SetWarning(wrong, "WRONG WAY", "TURN AROUND", WrongWayWarn + WrongWayGrace - p.wrongWay, WrongWayGrace);
+				}
+				if ((oob || wrong) && Time.time >= p.nextAlarm)
 				{
 					p.nextAlarm = Time.time + 0.3f;
 					AudioSynth.Play(AudioSynth.Beep, 0.45f, 1.7f);
@@ -262,7 +271,6 @@ namespace GliderJam.Race
 					GliderInput.Rumble(i, _players.Count == 1, 0f, 0f);
 				}
 			}
-			UpdateRings();
 
 			if (_endAt > 0f && Time.time >= _endAt)
 			{
@@ -291,58 +299,31 @@ namespace GliderJam.Race
 			return r;
 		}
 
-		// A checkpoint counts when the glider crosses the ring's plane inside the ring.
-		// Crossing the plane outside the ring, or flying well past it, counts as missed (+penalty).
-		private void CheckCheckpoint(int i, Player p, Vector3 a, Vector3 b)
+		private static string Distance(float meters)
 		{
-			if (p.nextCp >= route.CheckpointCount) return;
-			Vector3 c = route.CheckpointPosition(p.nextCp);
-			Vector3 f = route.CheckpointForward(p.nextCp);
-			float s0 = Vector3.Dot(a - c, f), s1 = Vector3.Dot(b - c, f);
-			bool last = p.nextCp == route.CheckpointCount - 1;
-			bool crossed = s0 < 0f && s1 >= 0f;
-			int cpPath = route.checkpoints[p.nextCp];
-			if (crossed)
-			{
-				Vector3 hit = a + (b - a) * (s0 / (s0 - s1));
-				float d = Vector3.Distance(hit, c);
-				if (d <= route.Radius(p.nextCp))
-				{
-					Pass(i, p, last, false);
-					return;
-				}
-				if (d <= route.Radius(p.nextCp) * 3f && !last)
-				{
-					Pass(i, p, false, true);
-					return;
-				}
-			}
-			if (!last && p.pathHint > cpPath + 6)
-			{
-				Pass(i, p, false, true);
-			}
+			return meters >= 1000f ? (meters / 1000f).ToString("0.0") + " km" : Mathf.RoundToInt(meters / 10f) * 10 + " m";
 		}
 
-		private void Pass(int i, Player p, bool finish, bool missed)
-		{
-			p.nextCp++;
-			if (missed)
-			{
-				p.missed++;
-				p.hud.ShowMessage("MISSED", "+" + missedPenalty.ToString("0") + " s penalty", new Color(1f, 0.45f, 0.35f), 1.2f);
-				AudioSynth.Play(AudioSynth.Beep, 0.5f, 0.6f);
-			}
-			else if (!finish)
-			{
-				p.hud.ShowMessage("", "CHECKPOINT " + p.nextCp + "/" + route.CheckpointCount, new Color(1f, 0.9f, 0.7f), 1f);
-				AudioSynth.Play(AudioSynth.Chime, 0.55f, i == 0 ? 1f : 1.12f);
-				Rumble(i, p, 0.25f, 0.2f, 0.12f);
-			}
-			if (!finish) return;
+		// Seconds of heading backwards before the warning shows, then before the glider is turned around.
+		private const float WrongWayWarn = 0.6f, WrongWayGrace = 3f;
 
+		private void TurnAround(Player p)
+		{
+			p.wrongWay = 0f;
+			Vector3 pos = p.glider.transform.position;
+			p.glider.Respawn(pos, Quaternion.LookRotation(Vector3.forward), 1.5f);
+			p.prevPos = pos;
+			p.visuals.ClearTrails();
+			p.cam.Snap();
+			p.hud.ShowMessage("", "TURNED AROUND", new Color(1f, 0.7f, 0.35f), 1.2f);
+		}
+
+		private void Finish(int i, Player p)
+		{
 			p.finished = true;
 			AudioSynth.Play(AudioSynth.Go, 0.9f, 0.8f);
-			p.finishTime = RaceTime + p.missed * missedPenalty;
+			Rumble(i, p, 0.4f, 0.4f, 0.3f);
+			p.finishTime = RaceTime;
 			if (_winner < 0)
 			{
 				_winner = i;
@@ -376,21 +357,25 @@ namespace GliderJam.Race
 			int i = _players.IndexOf(p);
 			CrashFX.Spawn(fx, point, velocity, g.transform.Find("Visual"), _cams);
 			p.cam.OnTargetCrashed(point);
-			p.hud.SetOutOfBounds(false, 0f, 1f);
-			bool outOfBounds = point.y > route.ceiling;
-			p.hud.ShowMessage(outOfBounds ? "OUT OF BOUNDS" : "CRASHED", "respawning at last checkpoint", new Color(1f, 0.4f, 0.3f), respawnDelay);
+			p.hud.SetWarning(false, "", "", 0f, 1f);
+			if (p.finished) return; // after the line: keep the result on screen, no respawn
+			bool outOfBounds = point.y > route.ceiling || !route.InsideCourse(point);
+			p.hud.ShowMessage(outOfBounds ? "OUT OF BOUNDS" : "CRASHED", "respawning", new Color(1f, 0.4f, 0.3f), respawnDelay);
 			Rumble(i, p, 1f, 1f, 0.55f);
+			p.crashPoint = point;
 			p.respawnAt = Time.time + respawnDelay;
 		}
 
+		// Back on the (known-clear) race line a little behind the crash.
 		private void Respawn(Player p)
 		{
 			p.respawnAt = -1f;
-			int pathIndex = p.nextCp == 0 ? 0 : route.checkpoints[p.nextCp - 1];
+			p.wrongWay = 0f;
+			int pathIndex = Mathf.Min(route.IndexAtZ(p.crashPoint.z - 120f), route.checkpoints[route.CheckpointCount - 1] - 4);
+			pathIndex = Mathf.Max(0, pathIndex);
 			Vector3 pos = route.path[pathIndex];
 			Vector3 fwd = Vector3.ProjectOnPlane(route.path[Mathf.Min(route.path.Length - 1, pathIndex + 3)] - pos, Vector3.up).normalized;
 			p.glider.Respawn(pos, Quaternion.LookRotation(fwd));
-			p.pathHint = pathIndex;
 			p.prevPos = pos;
 			p.visuals.ClearTrails();
 			p.cam.Snap();
@@ -406,7 +391,7 @@ namespace GliderJam.Race
 				bool has = i < _players.Count;
 				GameSettings.Finished[i] = has && _players[i].finished;
 				GameSettings.FinishTimes[i] = has ? _players[i].finishTime : 0f;
-				GameSettings.MissedCheckpoints[i] = has ? _players[i].missed : 0;
+				GameSettings.MissedCheckpoints[i] = 0;
 			}
 			SceneManager.LoadScene(GameSettings.EndScene);
 		}
@@ -445,7 +430,7 @@ namespace GliderJam.Race
 			var dir = camGo.AddComponent<ShowcaseDirector>();
 			dir.subjects = _showcaseGliders.ToArray();
 			dir.route = route;
-			BuildRings();
+			BuildFinishLine();
 		}
 
 		private void UpdateShowcase()
@@ -460,82 +445,38 @@ namespace GliderJam.Race
 					g.GetComponent<GliderVisuals>().ClearTrails();
 				}
 			}
-			UpdateRings();
 		}
 
-		// ---------------------------------------------------------------- rings
+		// ---------------------------------------------------------------- finish line
 
-		private void BuildRings()
+		// Free route: a line of glowing gold pillars and bars across the whole course at the finish.
+		private void BuildFinishLine()
 		{
-			var root = new GameObject("Checkpoint Rings").transform;
-			Mesh ring = Torus(1f, 0.026f, 72, 10);
-			for (int i = 0; i < route.CheckpointCount; i++)
+			var root = new GameObject("Finish Line").transform;
+			float z = route.FinishZ, top = route.ceiling;
+			float x0 = float.IsInfinity(route.minX) ? route.CheckpointPosition(route.CheckpointCount - 1).x - 500f : route.minX;
+			float x1 = float.IsInfinity(route.maxX) ? x0 + 1000f : route.maxX;
+			int n = Mathf.Max(2, Mathf.RoundToInt((x1 - x0) / 45f));
+			for (int k = 0; k <= n; k++)
 			{
-				bool last = i == route.CheckpointCount - 1;
-				var go = new GameObject(last ? "Finish Gate" : "Checkpoint " + (i + 1));
-				go.transform.SetParent(root, false);
-				go.transform.position = route.CheckpointPosition(i);
-				go.transform.rotation = Quaternion.LookRotation(route.CheckpointForward(i));
-				go.transform.localScale = Vector3.one * route.Radius(i);
-				go.AddComponent<MeshFilter>().sharedMesh = ring;
-				var mr = go.AddComponent<MeshRenderer>();
-				mr.sharedMaterial = last ? fx.ringFinish : fx.ring;
-				mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-				if (last)
-				{
-					var inner = Instantiate(go, go.transform.position, go.transform.rotation * Quaternion.Euler(0f, 0f, 45f), root);
-					inner.transform.localScale = Vector3.one * route.Radius(i) * 0.86f;
-				}
-				_rings.Add(go.transform);
+				float x = Mathf.Lerp(x0, x1, k / (float)n);
+				Beam(root, new Vector3(x, top * 0.5f - 10f, z), new Vector3(1.4f, top + 20f, 1.4f));
 			}
+			for (float y = 40f; y <= top; y += 70f) Beam(root, new Vector3((x0 + x1) * 0.5f, y, z), new Vector3(x1 - x0, 0.7f, 0.7f));
+			Beam(root, new Vector3((x0 + x1) * 0.5f, top, z), new Vector3(x1 - x0, 1.2f, 1.2f));
 		}
 
-		private void UpdateRings()
+		private void Beam(Transform parent, Vector3 center, Vector3 size)
 		{
-			int lowest = int.MaxValue;
-			foreach (Player p in _players) lowest = Mathf.Min(lowest, p.nextCp);
-			for (int i = 0; i < _rings.Count; i++)
-			{
-				// Rings everyone has passed shrink away; the rest slowly spin.
-				bool passed = i < lowest;
-				Transform t = _rings[i];
-				float target = passed ? 0.01f : route.Radius(i);
-				t.localScale = Vector3.one * Mathf.Lerp(t.localScale.x, target, 1f - Mathf.Exp(-4f * Time.deltaTime));
-				t.Rotate(0f, 0f, 12f * Time.deltaTime, Space.Self);
-			}
-		}
-
-		private static Mesh Torus(float radius, float tube, int seg, int sides)
-		{
-			var v = new List<Vector3>();
-			var n = new List<Vector3>();
-			var t = new List<int>();
-			for (int i = 0; i <= seg; i++)
-			{
-				float a = i * Mathf.PI * 2f / seg;
-				var c = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0f) * radius;
-				for (int j = 0; j <= sides; j++)
-				{
-					float b = j * Mathf.PI * 2f / sides;
-					Vector3 dir = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0f) * Mathf.Cos(b) + Vector3.forward * Mathf.Sin(b);
-					v.Add(c + dir * tube);
-					n.Add(dir);
-				}
-			}
-			for (int i = 0; i < seg; i++)
-			{
-				for (int j = 0; j < sides; j++)
-				{
-					int a = i * (sides + 1) + j, b = a + sides + 1;
-					t.AddRange(new[] { a, b, a + 1, a + 1, b, b + 1 });
-				}
-			}
-			var m = new Mesh { name = "Ring" };
-			m.SetVertices(v);
-			m.SetNormals(n);
-			m.SetTriangles(t, 0);
-			m.RecalculateBounds();
-			return m;
+			GameObject b = GameObject.CreatePrimitive(PrimitiveType.Cube);
+			Destroy(b.GetComponent<Collider>());
+			b.name = "Finish Beam";
+			b.transform.SetParent(parent, false);
+			b.transform.position = center;
+			b.transform.localScale = size;
+			var mr = b.GetComponent<MeshRenderer>();
+			mr.sharedMaterial = fx.ringFinish;
+			mr.shadowCastingMode = ShadowCastingMode.Off;
 		}
 
 		// The original scene's player, camera, HUD and portal effects are replaced by this race system.
