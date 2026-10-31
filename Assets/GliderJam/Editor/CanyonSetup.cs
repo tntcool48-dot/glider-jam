@@ -50,6 +50,7 @@ namespace GliderJam.EditorTools
 			amb.waterfallMaterial = AssetDatabase.LoadAssetAtPath<Material>("Assets/GliderJam/Art/FX/FX_Smoke.mat");
 			amb.waterfalls = FindWaterfalls(route).ToArray();
 			EditorUtility.SetDirty(amb);
+			int spires = AddSpires(route);
 
 			// Mist: drifting 3D noise in the valley fog volumes.
 			Texture3D noise = MistNoise();
@@ -78,7 +79,114 @@ namespace GliderJam.EditorTools
 			EditorSceneManager.MarkSceneDirty(go.scene);
 			EditorSceneManager.SaveOpenScenes();
 			AssetDatabase.SaveAssets();
-			return "canyon ambience: " + flocks.Count + " flocks, " + amb.waterfalls.Length + " waterfalls, mist volumes " + volumes + (AtmosphereSetup.Missing.Count > 0 ? "; missing: " + string.Join(", ", AtmosphereSetup.Missing) : "");
+			return "canyon ambience: " + flocks.Count + " flocks, " + amb.waterfalls.Length + " waterfalls, " + spires + " spires/fins, mist volumes " + volumes + (AtmosphereSetup.Missing.Count > 0 ? "; missing: " + string.Join(", ", AtmosphereSetup.Missing) : "");
+		}
+
+		// Free routing lets players take any line through the open valley, so add more to weave through: sandstone spires
+		// and rock fins (long axis across the race direction) on the open valley floor, at least 75 m from the race line.
+		// They use the terrain's own rock material (world-mapped, layer weights in vertex colours) and mesh colliders.
+		private static int AddSpires(RaceRoute route)
+		{
+			GameObject old = GameObject.Find("/Canyon Spires");
+			if (old != null) Object.DestroyImmediate(old);
+			var root = new GameObject("Canyon Spires");
+			Material rock = Object.FindFirstObjectByType<MeshTerrain>().material;
+			Terrain[] terrains = Terrain.activeTerrains;
+			float H(float x, float z)
+			{
+				foreach (Terrain t in terrains)
+				{
+					Vector3 p = t.transform.position, s = t.terrainData.size;
+					if (x >= p.x && x <= p.x + s.x && z >= p.z && z <= p.z + s.z) return t.SampleHeight(new Vector3(x, 0f, z)) + p.y;
+				}
+				return float.NaN;
+			}
+			float RouteDist(Vector2 a, Vector2 b)
+			{
+				float best = float.MaxValue;
+				foreach (Vector3 p in route.path)
+				{
+					var q = new Vector2(p.x, p.z);
+					Vector2 ab = b - a;
+					float t = ab.sqrMagnitude < 1e-3f ? 0f : Mathf.Clamp01(Vector2.Dot(q - a, ab) / ab.sqrMagnitude);
+					best = Mathf.Min(best, Vector2.Distance(q, a + ab * t));
+				}
+				return best;
+			}
+			var rng = new System.Random(4242);
+			float Rn(float a, float b) => a + (b - a) * (float)rng.NextDouble();
+			var placed = new List<Vector2>();
+			Directory.CreateDirectory(Dir + "/Spires");
+			foreach (string guid in AssetDatabase.FindAssets("t:Mesh", new[] { Dir + "/Spires" })) AssetDatabase.DeleteAsset(AssetDatabase.GUIDToAssetPath(guid));
+			for (int attempt = 0; attempt < 5000 && placed.Count < 42; attempt++)
+			{
+				float x = Rn(70f, 930f), z = Rn(route.StartZ + 350f, route.FinishZ - 250f);
+				float g = H(x, z);
+				if (float.IsNaN(g) || g > 70f) continue; // open valley floor only
+				var c = new Vector2(x, z);
+				if (placed.Exists(p => Vector2.Distance(p, c) < 130f)) continue;
+				bool fin = rng.NextDouble() < 0.35;
+				float radius = Rn(18f, 40f), height = Rn(230f, 340f);
+				float sx = fin ? Rn(2.2f, 3.4f) : Rn(0.8f, 1.25f), sz = fin ? Rn(0.45f, 0.7f) : Rn(0.8f, 1.25f);
+				float yaw = fin ? Rn(-30f, 30f) : Rn(0f, 360f); // fins lie across the race direction (+Z)
+				Vector2 axis = new Vector2(Mathf.Cos(yaw * Mathf.Deg2Rad), -Mathf.Sin(yaw * Mathf.Deg2Rad)) * radius * sx;
+				if (RouteDist(c - axis, c + axis) < 75f + radius * Mathf.Max(sz, fin ? 0.7f : sx)) continue;
+				Mesh m = SpireMesh(radius, height, sx, sz, placed.Count);
+				AssetDatabase.CreateAsset(m, Dir + "/Spires/Spire_" + placed.Count + ".asset");
+				var go = new GameObject(fin ? "Rock Fin" : "Rock Spire");
+				go.transform.SetParent(root.transform, false);
+				go.transform.SetPositionAndRotation(new Vector3(x, g - 10f, z), Quaternion.Euler(0f, yaw, 0f));
+				go.AddComponent<MeshFilter>().sharedMesh = m;
+				var r = go.AddComponent<MeshRenderer>();
+				r.sharedMaterial = rock;
+				r.rayTracingMode = UnityEngine.Experimental.Rendering.RayTracingMode.Static;
+				go.AddComponent<MeshCollider>().sharedMesh = m;
+				placed.Add(c);
+			}
+			return placed.Count;
+		}
+
+		// Tapering sandstone column with strata ledges and noise, a rounded grassy top; vertex colours are the terrain
+		// material's layer weights (grass, scree, moss).
+		private static Mesh SpireMesh(float radius, float height, float sx, float sz, int seed)
+		{
+			const int seg = 24, rings = 30;
+			var v = new List<Vector3>();
+			var col = new List<Color32>();
+			var tris = new List<int>();
+			for (int k = 0; k <= rings; k++)
+			{
+				float t = k / (float)rings, y = t * height;
+				float strata = 1f + 0.05f * Mathf.Round(Mathf.Sin(t * 40f + seed) * 1.5f);
+				float taper = Mathf.Lerp(1.15f, 0.62f, t) * strata;
+				if (t > 0.94f) taper *= Mathf.Sqrt(Mathf.Max(0f, 1f - (t - 0.94f) / 0.06f)) * 0.9f + 0.1f; // rounded top
+				for (int s = 0; s <= seg; s++)
+				{
+					float a = s / (float)seg * Mathf.PI * 2f;
+					float n = WorldNoise.Fbm(Mathf.Cos(a) * 2f + seed * 3.1f, y / 45f + Mathf.Sin(a) * 2f, 3);
+					float r = radius * taper * (1f + 0.18f * n);
+					v.Add(new Vector3(Mathf.Cos(a) * r * sx, y, Mathf.Sin(a) * r * sz));
+					float moss = Mathf.Clamp01(0.25f + 0.9f * WorldNoise.Perlin3(Mathf.Cos(a) * 3f, y / 20f, Mathf.Sin(a) * 3f + seed)) * Mathf.Lerp(0.9f, 0.3f, t);
+					byte grass = (byte)(t > 0.95f ? 255 : 0);
+					col.Add(new Color32(grass, 0, (byte)(moss * 255f), 255));
+				}
+			}
+			int row = seg + 1;
+			for (int k = 0; k < rings; k++)
+			{
+				for (int s = 0; s < seg; s++)
+				{
+					int a = k * row + s, b = a + 1, c = a + row, d = c + 1;
+					tris.AddRange(new[] { a, c, b, b, c, d });
+				}
+			}
+			var m = new Mesh { name = "Spire" };
+			m.SetVertices(v);
+			m.SetColors(col);
+			m.SetTriangles(tris, 0);
+			m.RecalculateNormals();
+			m.RecalculateBounds();
+			return m;
 		}
 
 		// Pillar edges beside the race line where water can spill towards it: walk outwards from the line until the

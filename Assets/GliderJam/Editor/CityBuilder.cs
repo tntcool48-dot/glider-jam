@@ -26,7 +26,7 @@ namespace GliderJam.EditorTools
 		private const string ProfilePath = "Assets/GliderJam/Settings/NightCity.asset";
 		private const string SampleDir = "Assets/Samples/High Definition Render Pipeline/17.3.0/Particle System Shader Samples/Materials/";
 		private const float Pitch = 180f, Street = 64f, HalfStreet = Street * 0.5f;
-		private const float Ceiling = 250f, ChunkSize = 720f, WaterZ = 4172f, FarShoreZ = 6300f;
+		private const float Ceiling = 150f, MinTower = 165f, ChunkSize = 720f, WaterZ = 4172f, FarShoreZ = 6300f;
 		private const float ColW = 4f, FloorH = 3.6f;
 		private const int TileCols = 16, TileFloors = 32, CellPx = 64, FloorPx = 48;
 		private const int CoreI0 = -5, CoreI1 = 5, CoreJ0 = -3, CoreJ1 = 22;
@@ -38,7 +38,7 @@ namespace GliderJam.EditorTools
 		// Race line through the grid: (avenue index, street index, altitude); corners are rounded.
 		private static readonly Vector3[] Waypoints =
 		{
-			W(0f, -1.5f, 80f), W(0f, 5f, 85f), W(2f, 5f, 95f), W(2f, 9f, 115f), W(-2f, 9f, 130f), W(-2f, 13f, 110f),
+			W(0f, -1.5f, 80f), W(0f, 5f, 85f), W(2f, 5f, 95f), W(2f, 9f, 100f), W(-2f, 9f, 105f), W(-2f, 13f, 100f),
 			W(0f, 13f, 95f), W(0f, 17f, 85f), W(3f, 17f, 90f), W(3f, 21f, 75f), W(3f, 24.6f, 40f), W(3f, 28.5f, 40f)
 		};
 		private const int FinishWaypoint = 10;
@@ -81,6 +81,7 @@ namespace GliderJam.EditorTools
 			var core = new Dictionary<Vector2Int, MB>();
 			var far = new Dictionary<Vector2Int, MB>();
 			var flicker = new[] { new MB(), new MB(), new MB() };
+			MakeBlockers(core);
 			MakeBridges(core);
 			MakeBlocks(core, flicker);
 			MakeStreets(core);
@@ -383,30 +384,129 @@ namespace GliderJam.EditorTools
 
 		// ================================================================ city
 
+		// Skybridges across avenues: three on the race line (two to fly under, one over) plus random ones at mixed
+		// heights elsewhere, kept clear of the race line by 20 m vertically.
 		private static void MakeBridges(Dictionary<Vector2Int, MB> core)
 		{
 			var specs = new[] { (x: 2f * Pitch, z: 7.5f * Pitch, under: true), (x: -2f * Pitch, z: 11.5f * Pitch, under: false), (x: 0f, z: 15.5f * Pitch, under: true) };
 			foreach (var s in specs)
 			{
 				RouteDistance(new Vector3(s.x, 0f, s.z), out Vector3 near);
-				float y0 = s.under ? near.y + 24f : near.y - 35f, y1 = y0 + 9f;
-				var min = new Vector3(s.x - HalfStreet - 9f, y0, s.z - 7f);
-				var max = new Vector3(s.x + HalfStreet + 9f, y1, s.z + 7f);
-				var b = new Bounds();
-				b.SetMinMax(min, max);
-				Bridges.Add(b);
-				MB mb = At(core, b.center);
-				mb.Box(min, max, Slot.Glass, Slot.Roof, new Vector2(R(0f, 40f), 0f), true, Slot.Metal);
-				Solid(min, max);
-				float ny = s.under ? y0 - 0.25f : y1 + 0.25f;
-				Tube(mb, new Vector3(min.x + 9f, ny, min.z + 0.4f), new Vector3(max.x - 9f, ny, min.z + 0.4f), 0.35f, Slot.NeonCyan);
-				Tube(mb, new Vector3(min.x + 9f, ny, max.z - 0.4f), new Vector3(max.x - 9f, ny, max.z - 0.4f), 0.35f, Slot.NeonCyan);
-				Tube(mb, new Vector3(min.x + 9f, (y0 + y1) * 0.5f, min.z - 0.3f), new Vector3(max.x - 9f, (y0 + y1) * 0.5f, min.z - 0.3f), 0.3f, Slot.NeonPink);
-				Tube(mb, new Vector3(min.x + 9f, (y0 + y1) * 0.5f, max.z + 0.3f), new Vector3(max.x - 9f, (y0 + y1) * 0.5f, max.z + 0.3f), 0.3f, Slot.NeonPink);
-				float ly = s.under ? y0 - 3f : y1 + 3f;
-				AddLight(new Vector3(s.x - 16f, ly, s.z), NeonColors[1], 9000f, 45f, 1f);
-				AddLight(new Vector3(s.x + 16f, ly, s.z), NeonColors[1], 9000f, 45f, 1f);
+				float y0 = s.under ? near.y + 24f : near.y - 35f;
+				AddBridge(core, s.x, s.z, y0, s.under);
 			}
+			for (int i = CoreI0 + 1; i <= CoreI1; i++)
+			{
+				for (int j = 1; j < CoreJ1; j++)
+				{
+					if (R() > 0.2f) continue;
+					float x = i * Pitch, z = (j + 0.5f) * Pitch;
+					if (Blocked.Exists(r => r.Contains(new Vector2(x, z)))) continue;
+					float y0 = R(25f, Ceiling - 20f);
+					bool clash = false;
+					foreach (Vector3 p in _route)
+					{
+						if (Mathf.Abs(p.x - x) < HalfStreet + 20f && Mathf.Abs(p.z - z) < 40f && p.y > y0 - 20f && p.y < y0 + 29f) clash = true;
+					}
+					foreach (Bounds b in Bridges)
+					{
+						if (Mathf.Abs(b.center.x - x) < 1f && Mathf.Abs(b.center.z - z) < 1f) clash = true;
+					}
+					if (!clash) AddBridge(core, x, z, y0, R() < 0.5f);
+				}
+			}
+		}
+
+		private static void AddBridge(Dictionary<Vector2Int, MB> core, float x, float z, float y0, bool lightsBelow)
+		{
+			float y1 = y0 + 9f;
+			var min = new Vector3(x - HalfStreet - 9f, y0, z - 7f);
+			var max = new Vector3(x + HalfStreet + 9f, y1, z + 7f);
+			var b = new Bounds();
+			b.SetMinMax(min, max);
+			Bridges.Add(b);
+			MB mb = At(core, b.center);
+			mb.Box(min, max, Slot.Glass, Slot.Roof, new Vector2(R(0f, 40f), 0f), true, Slot.Metal);
+			Solid(min, max);
+			float ny = lightsBelow ? y0 - 0.25f : y1 + 0.25f;
+			Tube(mb, new Vector3(min.x + 9f, ny, min.z + 0.4f), new Vector3(max.x - 9f, ny, min.z + 0.4f), 0.35f, Slot.NeonCyan);
+			Tube(mb, new Vector3(min.x + 9f, ny, max.z - 0.4f), new Vector3(max.x - 9f, ny, max.z - 0.4f), 0.35f, Slot.NeonCyan);
+			Tube(mb, new Vector3(min.x + 9f, (y0 + y1) * 0.5f, min.z - 0.3f), new Vector3(max.x - 9f, (y0 + y1) * 0.5f, min.z - 0.3f), 0.3f, Slot.NeonPink);
+			Tube(mb, new Vector3(min.x + 9f, (y0 + y1) * 0.5f, max.z + 0.3f), new Vector3(max.x - 9f, (y0 + y1) * 0.5f, max.z + 0.3f), 0.3f, Slot.NeonPink);
+			if (Bridges.Count <= 3 || R() < 0.3f)
+			{
+				float ly = lightsBelow ? y0 - 3f : y1 + 3f;
+				AddLight(new Vector3(x - 16f, ly, z), NeonColors[1], 9000f, 45f, 1f);
+				AddLight(new Vector3(x + 16f, ly, z), NeonColors[1], 9000f, 45f, 1f);
+			}
+		}
+
+		// ---------------------------------------------------------------- maze
+
+		private static readonly List<Rect> Blocked = new List<Rect>(); // street segments closed by buildings (xz)
+
+		private static bool RouteNear(Rect r, float margin)
+		{
+			foreach (Vector3 p in _route)
+			{
+				if (p.x > r.xMin - margin && p.x < r.xMax + margin && p.z > r.yMin - margin && p.z < r.yMax + margin) return true;
+			}
+			return false;
+		}
+
+		// Free-route racing would otherwise be "fly up any avenue": close about a third of the avenue segments and a
+		// quarter of the cross-street segments with buildings that span the street (taller than the ceiling). The race
+		// line stays open, the start rows and the waterfront too, and wherever an avenue is closed ahead at least one
+		// side street stays open (a dead end would need a U-turn, which the wrong-way rule turns back around).
+		private static void MakeBlockers(Dictionary<Vector2Int, MB> core)
+		{
+			Blocked.Clear();
+			var avenue = new HashSet<(int, int)>();
+			var street = new HashSet<(int, int)>();
+			for (int i = CoreI0; i <= CoreI1 + 1; i++)
+			{
+				for (int j = 0; j < CoreJ1; j++)
+				{
+					if (R() > 0.38f) continue;
+					float x = i * Pitch;
+					Rect r = Rect.MinMaxRect(x - HalfStreet - 2f, j * Pitch + HalfStreet + 8f, x + HalfStreet + 2f, (j + 1) * Pitch - HalfStreet - 8f);
+					if (RouteNear(r, 25f)) continue;
+					avenue.Add((i, j));
+					Blocker(core, r);
+				}
+			}
+			bool Open(int i, int j) => i >= CoreI0 && i <= CoreI1 && !street.Contains((i, j));
+			for (int j = 1; j <= CoreJ1; j++)
+			{
+				for (int i = CoreI0; i <= CoreI1; i++)
+				{
+					if (R() > 0.3f) continue;
+					// This segment is the east exit of intersection (i, j) and the west exit of (i + 1, j).
+					if (avenue.Contains((i, j)) && !Open(i - 1, j)) continue;
+					if (avenue.Contains((i + 1, j)) && !Open(i + 1, j)) continue;
+					float z = j * Pitch;
+					Rect r = Rect.MinMaxRect(i * Pitch + HalfStreet + 8f, z - HalfStreet - 2f, (i + 1) * Pitch - HalfStreet - 8f, z + HalfStreet + 2f);
+					if (RouteNear(r, 25f)) continue;
+					street.Add((i, j));
+					Blocker(core, r);
+				}
+			}
+		}
+
+		private static void Blocker(Dictionary<Vector2Int, MB> core, Rect r)
+		{
+			Blocked.Add(r);
+			float h = R(175f, 300f);
+			var min = new Vector3(r.xMin, 0f, r.yMin);
+			var max = new Vector3(r.xMax, h, r.yMax);
+			Slot[] styles = { Slot.Housing, Slot.Dim, Slot.Office, Slot.Concrete };
+			MB mb = At(core, (min + max) * 0.5f);
+			mb.Box(min, max, styles[_rng.Next(styles.Length)], Slot.Roof, new Vector2(_rng.Next(0, 16) * ColW, _rng.Next(0, 32) * FloorH));
+			Solid(min, max);
+			// A neon band at street level and one higher up, so closed streets read from a distance.
+			Ring(mb, min, max, R(12f, 24f), 0.3f, 0.5f, NeonSlots[_rng.Next(NeonSlots.Length)]);
+			if (R() < 0.6f) Ring(mb, min, max, R(60f, Ceiling - 10f), 0.3f, 0.5f, NeonSlots[_rng.Next(NeonSlots.Length)]);
+			if (R() < 0.5f) Ring(mb, min, max, h + 0.2f, -0.5f, 0.4f, NeonSlots[_rng.Next(NeonSlots.Length)]);
 		}
 
 		private static void MakeBlocks(Dictionary<Vector2Int, MB> core, MB[] flicker)
@@ -473,7 +573,7 @@ namespace GliderJam.EditorTools
 			float dRoute = RouteDistance(center, out Vector3 nearest);
 			float downtown = WorldNoise.SmoothStep(560f, 140f, dRoute);
 			float h = Mathf.Lerp(28f + 110f * Mathf.Pow(R(), 1.6f), 130f + 300f * Mathf.Pow(R(), 1.2f), downtown);
-			h = Mathf.Max(h, BridgeMin(lot));
+			h = Mathf.Max(Mathf.Max(h, BridgeMin(lot)), MinTower); // taller than the ceiling: no flying over the blocks
 			float cap = HeightCap(lot);
 			if (h > cap) h = cap;
 			if (h < 12f) return; // open plaza on the inside of a corner
@@ -960,14 +1060,20 @@ namespace GliderJam.EditorTools
 			{
 				// Cars heading north show the racers their tail lights, oncoming cars their headlights.
 				float x = i * Pitch;
-				Lane(new Vector3(x + 6f, 1.1f, z0), new Vector3(x + 6f, 1.1f, z1), tail, R(17f, 25f), 0.7f);
-				Lane(new Vector3(x - 6f, 1.1f, z1), new Vector3(x - 6f, 1.1f, z0), head, R(17f, 25f), 0.7f);
+				foreach (Vector2 s in OpenSpans(true, x, z0, z1))
+				{
+					Lane(new Vector3(x + 6f, 1.1f, s.x), new Vector3(x + 6f, 1.1f, s.y), tail, R(17f, 25f), 0.7f);
+					Lane(new Vector3(x - 6f, 1.1f, s.y), new Vector3(x - 6f, 1.1f, s.x), head, R(17f, 25f), 0.7f);
+				}
 			}
 			for (int j = CoreJ0; j <= CoreJ1 + 1; j++)
 			{
 				float z = j * Pitch;
-				Lane(new Vector3(x0, 1.1f, z + 6f), new Vector3(x1, 1.1f, z + 6f), tail, R(15f, 22f), 0.45f);
-				Lane(new Vector3(x1, 1.1f, z - 6f), new Vector3(x0, 1.1f, z - 6f), head, R(15f, 22f), 0.45f);
+				foreach (Vector2 s in OpenSpans(false, z, x0, x1))
+				{
+					Lane(new Vector3(s.x, 1.1f, z + 6f), new Vector3(s.y, 1.1f, z + 6f), tail, R(15f, 22f), 0.45f);
+					Lane(new Vector3(s.y, 1.1f, z - 6f), new Vector3(s.x, 1.1f, z - 6f), head, R(15f, 22f), 0.45f);
+				}
 			}
 			Color[] sky = { new Color(0.3f, 0.9f, 1f), new Color(1f, 0.6f, 0.2f), new Color(1f, 0.25f, 0.7f) };
 			int[] streets = { 2, 6, 9, 12, 15, 19 };
@@ -983,6 +1089,27 @@ namespace GliderJam.EditorTools
 			w.laneColor = col.ToArray();
 			w.laneSpeed = speed.ToArray();
 			w.laneRate = rate.ToArray();
+		}
+
+		// Stretches of a street line (along z at x = coord, or along x at z = coord) not closed by a blocking building.
+		private static List<Vector2> OpenSpans(bool alongZ, float coord, float from, float to)
+		{
+			var cuts = new List<Vector2>();
+			foreach (Rect r in Blocked)
+			{
+				if (alongZ && coord >= r.xMin && coord <= r.xMax) cuts.Add(new Vector2(r.yMin, r.yMax));
+				if (!alongZ && coord >= r.yMin && coord <= r.yMax) cuts.Add(new Vector2(r.xMin, r.xMax));
+			}
+			cuts.Sort((a, b) => a.x.CompareTo(b.x));
+			var spans = new List<Vector2>();
+			float s = from;
+			foreach (Vector2 c in cuts)
+			{
+				if (c.x - s > 80f) spans.Add(new Vector2(s, c.x - 4f));
+				s = Mathf.Max(s, c.y + 4f);
+			}
+			if (to - s > 80f) spans.Add(new Vector2(s, to));
+			return spans;
 		}
 
 		private static void MakeColliders(Transform parent)

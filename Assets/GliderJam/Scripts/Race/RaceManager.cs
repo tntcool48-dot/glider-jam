@@ -189,7 +189,7 @@ namespace GliderJam.Race
 				if (n != _lastCountdown && n <= countdownSeconds && n > 0)
 				{
 					_lastCountdown = n;
-					foreach (Player p in _players) p.hud.ShowMessage(n.ToString(), "", Color.white, 0.9f);
+					for (int k = 0; k < _players.Count; k++) _players[k].hud.ShowMessage(n.ToString(), ControlsHint(k), Color.white, 0.9f);
 					AudioSynth.Play(AudioSynth.Beep, 0.7f);
 				}
 				if (Time.time >= _countdownEnd)
@@ -297,6 +297,23 @@ namespace GliderJam.Race
 				if (j != i && _players[j].progress > _players[i].progress) r++;
 			}
 			return r;
+		}
+
+		// Shown under the countdown: this player's boost / brake keys (and the pad triggers if a pad is connected).
+		private string ControlsHint(int i)
+		{
+			UnityEngine.InputSystem.Key[] k = GameConfig.Current.players[Mathf.Clamp(i, 0, 1)].keys;
+			string s = "BOOST  " + KeyName(k[(int)ControlAction.Boost]) + "      BRAKE  " + KeyName(k[(int)ControlAction.Brake]);
+			int pads = UnityEngine.InputSystem.Gamepad.all.Count;
+			if (_players.Count == 1 ? pads > 0 : pads > i) s += "      PAD  RT / LT";
+			return s;
+		}
+
+		private static string KeyName(UnityEngine.InputSystem.Key key)
+		{
+			var c = UnityEngine.InputSystem.Keyboard.current?[key];
+			string n = c != null ? c.displayName : key.ToString();
+			return (string.IsNullOrEmpty(n) ? key.ToString() : n).ToUpper();
 		}
 
 		private static string Distance(float meters)

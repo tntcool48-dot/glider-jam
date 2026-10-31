@@ -79,6 +79,7 @@ namespace GliderJam
 
 		// ---- controls
 		public PlayerControls[] players = DefaultPlayers();
+		public int controlsVersion; // 2: player 2 boosts with Right Shift (next to the arrows), brakes with Right Ctrl
 
 		// ---- records
 		public float bestSoloCanyon;
@@ -124,7 +125,7 @@ namespace GliderJam
 			return new[]
 			{
 				new PlayerControls { keys = new[] { Key.W, Key.S, Key.A, Key.D, Key.Space, Key.LeftShift } },
-				new PlayerControls { keys = new[] { Key.UpArrow, Key.DownArrow, Key.LeftArrow, Key.RightArrow, Key.RightCtrl, Key.RightShift } }
+				new PlayerControls { keys = new[] { Key.UpArrow, Key.DownArrow, Key.LeftArrow, Key.RightArrow, Key.RightShift, Key.RightCtrl } }
 			};
 		}
 
@@ -188,6 +189,17 @@ namespace GliderJam
 				p.fieldOfView = Mathf.Clamp(p.fieldOfView <= 1f ? 62f : p.fieldOfView, 50f, 100f);
 			}
 			renderScale = Mathf.Clamp(renderScale == 0 ? 100 : renderScale, 50, 100);
+			if (controlsVersion < 2)
+			{
+				// Saved before the swap and still on the old defaults: move them to the new layout.
+				Key[] k = players[1].keys;
+				if (k[(int)ControlAction.Boost] == Key.RightCtrl && k[(int)ControlAction.Brake] == Key.RightShift)
+				{
+					k[(int)ControlAction.Boost] = Key.RightShift;
+					k[(int)ControlAction.Brake] = Key.RightCtrl;
+				}
+				controlsVersion = 2;
+			}
 		}
 
 		public void Save()
