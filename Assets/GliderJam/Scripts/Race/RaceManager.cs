@@ -137,6 +137,7 @@ namespace GliderJam.Race
 
 				p.hud = new GameObject("HUD P" + (i + 1)).AddComponent<PlayerHUD>();
 				p.hud.Init(canvas, cam, i, count, vp);
+				p.hud.SetRoute(route, i, count);
 				p.prevPos = pos;
 				p.glider.Frozen = true;
 				_players.Add(p);
@@ -238,6 +239,8 @@ namespace GliderJam.Race
 					string label = "P" + (2 - i) + "  " + Mathf.RoundToInt(Vector3.Distance(pos, op)) + " m";
 					p.hud.UpdateOther(op, label, !o.glider.Crashed);
 				}
+				Vector3 otherPos = _players.Count == 2 ? _players[1 - i].glider.transform.position : pos;
+				p.hud.UpdateMap(pos, p.glider.Yaw, otherPos, _players.Count == 2 && !_players[1 - i].glider.Crashed, cp);
 
 				// Above the ceiling: warning + alarm, countdown to destruction.
 				bool oob = p.glider.OutOfBounds && !p.glider.Crashed;

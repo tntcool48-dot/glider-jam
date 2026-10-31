@@ -118,6 +118,105 @@ namespace GliderJam.UI
 			_nextArrow.gameObject.SetActive(false);
 		}
 
+		// ---------------------------------------------------------------- minimap
+
+		private RectTransform _map;
+		private Image _mapMe, _mapOther, _mapNext;
+		private Vector2 _mapMin;
+		private float _mapScale;
+
+		// North-up overview of the whole race line on the right edge: line and checkpoints drawn once into a
+		// texture, live markers for this player (heading arrow), the other player and the next checkpoint.
+		public void SetRoute(Race.RaceRoute route, int player, int playerCount)
+		{
+			float s = playerCount > 1 ? 0.8f : 1f;
+			Vector2 min = new Vector2(float.MaxValue, float.MaxValue), max = new Vector2(float.MinValue, float.MinValue);
+			foreach (Vector3 p in route.path)
+			{
+				min = Vector2.Min(min, new Vector2(p.x, p.z));
+				max = Vector2.Max(max, new Vector2(p.x, p.z));
+			}
+			var size = new Vector2(104f, 340f) * s;
+			if (playerCount > 1) size.y = Mathf.Min(size.y, 260f);
+			const float pad = 12f;
+			_mapScale = Mathf.Min((size.x - 2f * pad) / Mathf.Max(1f, max.x - min.x), (size.y - 2f * pad) / Mathf.Max(1f, max.y - min.y));
+			// Centre the route in the panel.
+			Vector2 used = (max - min) * _mapScale;
+			_mapMin = min - new Vector2((size.x - used.x) * 0.5f, (size.y - used.y) * 0.5f) / _mapScale;
+
+			_map = Panel(_root, new Vector2(1f, 0.5f), new Vector2(-28f, 0f), size);
+			_map.pivot = new Vector2(1f, 0.5f);
+			_map.anchoredPosition = new Vector2(-28f, -20f * s);
+			Accent(_map, _color);
+			const int k = 3; // texture supersampling
+			int tw = Mathf.CeilToInt(size.x * k), th = Mathf.CeilToInt(size.y * k);
+			var px = new Color32[tw * th];
+			Vector2 ToTex(Vector3 w) => (new Vector2(w.x, w.z) - _mapMin) * _mapScale * k;
+			for (int i = 1; i < route.path.Length; i++) Line(px, tw, th, ToTex(route.path[i - 1]), ToTex(route.path[i]), 2.2f * k * s, new Color32(255, 255, 255, 120));
+			for (int c = 0; c < route.CheckpointCount; c++)
+			{
+				bool finish = c == route.CheckpointCount - 1;
+				Vector2 q = ToTex(route.CheckpointPosition(c));
+				Line(px, tw, th, q, q, (finish ? 5f : 3.2f) * k * s, finish ? new Color32(255, 196, 80, 255) : new Color32(255, 235, 200, 200));
+			}
+			var tex = new Texture2D(tw, th, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+			tex.SetPixels32(px);
+			tex.Apply(false, true);
+			RectTransform img = New("Route", _map);
+			img.anchorMin = Vector2.zero;
+			img.anchorMax = Vector2.one;
+			img.offsetMin = img.offsetMax = Vector2.zero;
+			img.gameObject.AddComponent<RawImage>().texture = tex;
+
+			_mapNext = Icon(_map, _ring, 14f * s, new Color(1f, 0.9f, 0.7f));
+			if (playerCount > 1) _mapOther = Icon(_map, _circle, 11f * s, GameSettings.PlayerColors[1 - Mathf.Clamp(player, 0, 1)]);
+			_mapMe = Icon(_map, _triangle, 18f * s, _color);
+			foreach (Image i in new[] { _mapNext, _mapOther, _mapMe })
+			{
+				if (i == null) continue;
+				i.rectTransform.anchorMin = i.rectTransform.anchorMax = Vector2.zero;
+			}
+		}
+
+		public void UpdateMap(Vector3 me, float yaw, Vector3 other, bool showOther, Vector3 next)
+		{
+			if (_map == null) return;
+			_mapMe.rectTransform.anchoredPosition = (new Vector2(me.x, me.z) - _mapMin) * _mapScale;
+			_mapMe.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -yaw);
+			_mapNext.rectTransform.anchoredPosition = (new Vector2(next.x, next.z) - _mapMin) * _mapScale;
+			if (_mapOther != null)
+			{
+				_mapOther.enabled = showOther;
+				_mapOther.rectTransform.anchoredPosition = (new Vector2(other.x, other.z) - _mapMin) * _mapScale;
+			}
+		}
+
+		// Anti-aliased thick line (round caps) blended into a pixel buffer.
+		private static void Line(Color32[] px, int w, int h, Vector2 a, Vector2 b, float radius, Color32 c)
+		{
+			int x0 = Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(a.x, b.x) - radius - 1)), x1 = Mathf.Min(w - 1, Mathf.CeilToInt(Mathf.Max(a.x, b.x) + radius + 1));
+			int y0 = Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(a.y, b.y) - radius - 1)), y1 = Mathf.Min(h - 1, Mathf.CeilToInt(Mathf.Max(a.y, b.y) + radius + 1));
+			Vector2 ab = b - a;
+			float len2 = Mathf.Max(1e-4f, ab.sqrMagnitude);
+			for (int y = y0; y <= y1; y++)
+			{
+				for (int x = x0; x <= x1; x++)
+				{
+					var p = new Vector2(x + 0.5f, y + 0.5f);
+					float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / len2);
+					float d = (p - (a + ab * t)).magnitude;
+					float cov = Mathf.Clamp01(radius - d + 0.5f) * c.a / 255f;
+					if (cov <= 0f) continue;
+					Color32 o = px[y * w + x];
+					float oa = o.a / 255f, na = cov + oa * (1f - cov);
+					if (na <= 0f) continue;
+					px[y * w + x] = new Color32(
+						(byte)((c.r * cov + o.r * oa * (1f - cov)) / na), (byte)((c.g * cov + o.g * oa * (1f - cov)) / na),
+						(byte)((c.b * cov + o.b * oa * (1f - cov)) / na), (byte)(na * 255f));
+				}
+			}
+		}
+
 		public void SetStats(int rank, int cp, int cpTotal, float time, float speedMs, float boost)
 		{
 			string[] suffix = { "ST", "ND", "RD", "TH" };
