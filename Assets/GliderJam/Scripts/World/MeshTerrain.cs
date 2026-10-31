@@ -35,6 +35,21 @@ namespace GliderJam.World
 		private float _sizeX, _sizeZ;
 		private readonly List<Terrain> _terrains = new List<Terrain>();
 
+		private readonly List<GameObject> _outerChunks = new List<GameObject>();
+		private int _backdrop = 2;
+
+		// Backdrop (surrounding landscape): 0 hidden, 1 lowest LOD only, 2 full LODs. Never casts shadows.
+		public void ApplyQuality(int backdrop, int terrainDetail)
+		{
+			_backdrop = Mathf.Clamp(backdrop, 0, 2);
+			foreach (GameObject go in _outerChunks)
+			{
+				if (go == null) continue;
+				go.SetActive(_backdrop > 0);
+				if (_backdrop > 0) go.GetComponent<LODGroup>().ForceLOD(_backdrop == 1 ? 2 : -1);
+			}
+		}
+
 		public float CorridorMinX => _origin.x;
 		public float CorridorMaxX => _origin.x + _sizeX;
 		public float CorridorMinZ => _origin.z;
@@ -63,6 +78,7 @@ namespace GliderJam.World
 
 		public void Clear()
 		{
+			_outerChunks.Clear();
 			for (int i = transform.childCount - 1; i >= 0; i--)
 			{
 				Transform c = transform.GetChild(i);
@@ -121,6 +137,7 @@ namespace GliderJam.World
 			{
 				t.drawHeightmap = false;
 			}
+			ApplyQuality(Application.isPlaying ? GameConfig.Current.backdrop : _backdrop, 0);
 		}
 
 		// ---------------------------------------------------------------- height field
@@ -362,11 +379,14 @@ namespace GliderJam.World
 				child.AddComponent<MeshFilter>().sharedMesh = mesh;
 				var mr = child.AddComponent<MeshRenderer>();
 				mr.sharedMaterial = material;
-				mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+				// The surrounding landscape is beyond the shadow range of the course: no shadow casting.
+				mr.shadowCastingMode = job.corridor ? UnityEngine.Rendering.ShadowCastingMode.On : UnityEngine.Rendering.ShadowCastingMode.Off;
+				mr.rayTracingMode = UnityEngine.Experimental.Rendering.RayTracingMode.Static;
 				lods[l] = new LOD(thresholds[l], new Renderer[] { mr });
 			}
 			lodGroup.SetLODs(lods);
 			lodGroup.RecalculateBounds();
+			if (!job.corridor) _outerChunks.Add(go);
 		}
 	}
 }

@@ -80,7 +80,7 @@ namespace GliderJam.Audio
 			var go = new GameObject("SFX " + clip.name);
 			var a = go.AddComponent<AudioSource>();
 			a.clip = clip;
-			a.volume = volume;
+			a.volume = volume * GameConfig.Current.effectsVolume;
 			a.pitch = pitch;
 			a.spatialBlend = 0f;
 			a.Play();

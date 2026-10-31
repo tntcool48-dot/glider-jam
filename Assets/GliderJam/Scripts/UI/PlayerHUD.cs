@@ -77,6 +77,23 @@ namespace GliderJam.UI
 			_sub = Text(_root, "", 30 * s, Vector2.zero, TextAlignmentOptions.Center, new Color(1f, 1f, 1f, 0.9f), FontStyles.Bold);
 			Center(_sub.rectTransform, new Vector2(0f, -30f * s), new Vector2(1400f, 50f));
 
+			// Out-of-bounds warning (above the ceiling)
+			_oob = New("OutOfBounds", _root);
+			_oob.anchorMin = Vector2.zero;
+			_oob.anchorMax = Vector2.one;
+			_oob.offsetMin = _oob.offsetMax = Vector2.zero;
+			_oobVignette = _oob.gameObject.AddComponent<Image>();
+			_oobVignette.sprite = UiKit.Vignette;
+			_oobVignette.color = new Color(1f, 0.08f, 0.05f, 0.7f);
+			_oobVignette.raycastTarget = false;
+			_oobTitle = Text(_oob, "PULL DOWN", 64 * s, Vector2.zero, TextAlignmentOptions.Center, new Color(1f, 0.35f, 0.3f), FontStyles.Bold | FontStyles.Italic);
+			Center(_oobTitle.rectTransform, new Vector2(0f, 150f * s), new Vector2(1400f, 90f));
+			_oobSub = Text(_oob, "RETURN BELOW THE CLOUDS", 26 * s, Vector2.zero, TextAlignmentOptions.Center, Color.white, FontStyles.Bold);
+			Center(_oobSub.rectTransform, new Vector2(0f, 95f * s), new Vector2(1400f, 40f));
+			_oobCount = Text(_oob, "", 120 * s, Vector2.zero, TextAlignmentOptions.Center, Color.white, FontStyles.Bold);
+			Center(_oobCount.rectTransform, new Vector2(0f, -40f * s), new Vector2(600f, 160f));
+			_oob.gameObject.SetActive(false);
+
 			// Markers
 			// The other player's marker and arrow use the other player's color.
 			Color other = GameSettings.PlayerColors[1 - Mathf.Clamp(player, 0, 1)];
@@ -109,6 +126,22 @@ namespace GliderJam.UI
 			_timer.text = GameSettings.FormatTime(Mathf.Max(0f, time)).Replace("--:--.--", "00:00.00");
 			_speed.text = Mathf.RoundToInt(speedMs * 3.6f).ToString();
 			_boostFill.fillAmount = boost;
+		}
+
+		private RectTransform _oob;
+		private Image _oobVignette;
+		private TextMeshProUGUI _oobTitle, _oobSub, _oobCount;
+
+		public void SetOutOfBounds(bool on, float secondsLeft, float grace)
+		{
+			if (_oob == null) return;
+			if (_oob.gameObject.activeSelf != on) _oob.gameObject.SetActive(on);
+			if (!on) return;
+			float urgency = 1f - Mathf.Clamp01(secondsLeft / Mathf.Max(0.01f, grace));
+			float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * (10f + urgency * 14f));
+			_oobVignette.color = new Color(1f, 0.08f, 0.05f, Mathf.Lerp(0.45f, 0.9f, urgency) * (0.75f + 0.25f * pulse));
+			_oobCount.text = secondsLeft.ToString("0.0");
+			_oobCount.color = Color.Lerp(Color.white, new Color(1f, 0.3f, 0.25f), urgency);
 		}
 
 		public void ShowMessage(string text, string sub, Color color, float seconds)
@@ -221,6 +254,7 @@ namespace GliderJam.UI
 			rt.anchoredPosition = pos;
 			rt.sizeDelta = new Vector2(600f, size * 1.3f);
 			var t = rt.gameObject.AddComponent<TextMeshProUGUI>();
+			t.font = UiKit.Font;
 			t.text = text;
 			t.fontSize = size;
 			t.color = color;

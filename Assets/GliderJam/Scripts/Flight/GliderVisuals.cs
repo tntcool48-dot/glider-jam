@@ -72,7 +72,7 @@ namespace GliderJam.Flight
 		private void LateUpdate()
 		{
 			if (_glider == null) return;
-			float roll = _glider.inputRoll, pitch = _glider.inputPitch;
+			float roll = _glider.inputTurn, pitch = _glider.inputPitch;
 			_ailL.localRotation = _ailL0 * Quaternion.AngleAxis(roll * 20f, Vector3.right);
 			_ailR.localRotation = _ailR0 * Quaternion.AngleAxis(-roll * 20f, Vector3.right);
 			_elev.localRotation = _elev0 * Quaternion.AngleAxis(-pitch * 18f, Vector3.right);
@@ -85,7 +85,7 @@ namespace GliderJam.Flight
 
 			_trail.emitting = !_glider.Crashed && !_glider.Frozen;
 			// Vapor at the wingtips in hard turns or at high speed.
-			float load = Mathf.Abs(_glider.Bank) / _glider.maxBank * 0.7f + Mathf.Abs(_glider.inputPitch) * 0.5f + _glider.SpeedNormalized * 0.5f;
+			float load = Mathf.Abs(_glider.Roll) / _glider.maxRoll * 0.7f + Mathf.Abs(_glider.inputPitch) * 0.5f + _glider.SpeedNormalized * 0.5f;
 			bool vapor = !_glider.Crashed && !_glider.Frozen && load > 0.75f;
 			_vaporL.emitting = vapor;
 			_vaporR.emitting = vapor;

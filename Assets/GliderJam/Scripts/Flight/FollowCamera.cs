@@ -93,7 +93,9 @@ namespace GliderJam.Flight
 			Quaternion want = Quaternion.LookRotation(lookPoint - transform.position, _smoothedUp);
 			transform.rotation = Quaternion.Slerp(transform.rotation, want, 1f - Mathf.Exp(-rotationSharpness * dt));
 
-			float fov = Mathf.Lerp(baseFov, boostFov, Mathf.SmoothStep(0f, 1f, speedK));
+			// Per-player field of view from the settings; boost widens it by ~12 degrees.
+			float playerFov = GameConfig.Current.players[Mathf.Clamp(target.PlayerIndex, 0, 1)].fieldOfView;
+			float fov = Mathf.Lerp(playerFov - 2f, playerFov + 12f, Mathf.SmoothStep(0f, 1f, speedK));
 			_cam.fieldOfView = Mathf.Lerp(_cam.fieldOfView, fov, 1f - Mathf.Exp(-3f * dt));
 			if (target.Boosting) _shake = Mathf.Max(_shake, 0.12f);
 			ApplyShake(dt);
@@ -102,6 +104,11 @@ namespace GliderJam.Flight
 		private void ApplyShake(float dt)
 		{
 			if (_shake <= 0.001f) return;
+			if (!GameConfig.Current.cameraShake)
+			{
+				_shake = 0f;
+				return;
+			}
 			float t = Time.time * 25f;
 			Vector3 offset = new Vector3(Mathf.PerlinNoise(t, 0.3f) - 0.5f, Mathf.PerlinNoise(0.7f, t) - 0.5f, 0f) * _shake;
 			transform.position += transform.rotation * offset;

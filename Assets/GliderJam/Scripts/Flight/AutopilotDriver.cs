@@ -34,7 +34,7 @@ namespace GliderJam.Flight
 			float yawErr = Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg;
 			Vector3 to = p - transform.position;
 			float pitchWant = Mathf.Atan2(to.y, new Vector2(to.x, to.z).magnitude) * Mathf.Rad2Deg;
-			_glider.inputRoll = Mathf.Clamp(yawErr / 18f, -1f, 1f);
+			_glider.inputTurn = Mathf.Clamp(yawErr / 18f, -1f, 1f);
 			_glider.inputPitch = Mathf.Clamp((pitchWant - _glider.PitchAngle) / 10f, -1f, 1f);
 			_glider.inputBoost = useBoost && Mathf.Abs(yawErr) < 6f && _glider.BoostEnergy > 0.4f;
 			_glider.inputBrake = Mathf.Abs(yawErr) > 40f;

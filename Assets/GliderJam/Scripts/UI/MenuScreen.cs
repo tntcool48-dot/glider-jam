@@ -83,6 +83,7 @@ namespace GliderJam.UI
 			rt.anchoredPosition = pos;
 			rt.sizeDelta = new Vector2(width, size * 1.25f);
 			var t = go.AddComponent<TextMeshProUGUI>();
+			t.font = UiKit.Font;
 			t.text = text;
 			t.fontSize = size;
 			t.color = color;

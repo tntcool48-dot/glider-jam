@@ -38,7 +38,7 @@ namespace GliderJam.UI
 					Label(tag + "    " + time + "    <size=70%>" + Missed(i) + "</size>", 40f, new Vector2(126f, -330f - i * 64f), Color.white, FontStyles.Bold, 1600f);
 				}
 			}
-			MakeButton("RESTART", new Vector2(120f, -620f), w >= 0 ? GameSettings.PlayerColors[w] : GameSettings.PlayerColors[0], () => Load(GameSettings.RaceScene));
+			MakeButton("RESTART", new Vector2(120f, -620f), w >= 0 ? GameSettings.PlayerColors[w] : GameSettings.PlayerColors[0], () => Load(GameSettings.Map));
 			MakeButton("MAIN MENU", new Vector2(120f, -720f), new Color(0.5f, 0.55f, 0.6f), () => Load(GameSettings.MenuScene));
 		}
 

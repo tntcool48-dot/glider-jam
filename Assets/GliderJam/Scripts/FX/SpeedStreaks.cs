@@ -53,6 +53,12 @@ namespace GliderJam.FX
 		private void Update()
 		{
 			if (glider == null || _ps == null) return;
+			if (!GameConfig.Current.speedEffects)
+			{
+				var off = _ps.emission;
+				off.rateOverTime = 0f;
+				return;
+			}
 			var em = _ps.emission;
 			float k = glider.Crashed || glider.Frozen ? 0f : Mathf.Clamp01((glider.SpeedNormalized - 0.55f) * 2.5f) + (glider.Boosting ? 0.6f : 0f);
 			em.rateOverTime = 260f * Mathf.Clamp01(k);

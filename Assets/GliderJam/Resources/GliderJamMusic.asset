@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d52238c5a22723340be033aeda78cd6e, type: 3}
+  m_Name: GliderJamMusic
+  m_EditorClassIdentifier: Assembly-CSharp::GliderJam.Audio.MusicLibrary
+  menu: {fileID: 8300000, guid: c825a67849ed8bb489550bf8982a3e56, type: 3}
+  race: {fileID: 8300000, guid: 1b62c00b77e27d543af65ee41d5d856e, type: 3}
+  city: {fileID: 8300000, guid: 587d343f6ff651041897c297dfee891c, type: 3}

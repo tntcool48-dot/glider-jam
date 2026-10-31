@@ -14,6 +14,22 @@ namespace GliderJam.World
 		public float lod0Distance = 320f;
 		public float shadowDistance = 650f;
 		public float cullDistance = 3500f;
+		[Range(0.05f, 1f)] public float density = 1f;
+
+		// Vegetation setting 0 low .. 3 ultra.
+		public void ApplyQuality(int level)
+		{
+			level = Mathf.Clamp(level, 0, 3);
+			float d = new[] { 0.35f, 0.65f, 1f, 1f }[level];
+			lod0Distance = new[] { 140f, 240f, 320f, 560f }[level];
+			shadowDistance = new[] { 0f, 280f, 650f, 1200f }[level];
+			cullDistance = new[] { 1500f, 2500f, 3500f, 6000f }[level];
+			if (!Mathf.Approximately(d, density))
+			{
+				density = d;
+				Build();
+			}
+		}
 
 		private class Proto
 		{
@@ -74,8 +90,11 @@ namespace GliderJam.World
 					map[i] = pi;
 				}
 				Vector3 o = t.transform.position, size = d.size;
+				int n = 0;
 				foreach (TreeInstance ti in d.treeInstances)
 				{
+					// Deterministic thinning for lower vegetation settings.
+					if (density < 1f && WorldNoise.Hash(n++, 17, 5) > density) continue;
 					Vector3 p = o + Vector3.Scale(ti.position, size);
 					p.y = o.y + t.SampleHeight(p);
 					var m = Matrix4x4.TRS(p, Quaternion.Euler(0f, ti.rotation * Mathf.Rad2Deg, 0f), new Vector3(ti.widthScale, ti.heightScale, ti.widthScale));

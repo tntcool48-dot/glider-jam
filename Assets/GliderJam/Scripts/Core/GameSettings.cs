@@ -34,13 +34,24 @@ namespace GliderJam
 		public static bool HasResult;
 
 		public const string RaceScene = "yazan scene";
+		public const string CityScene = "City";
 		public const string MenuScene = "mainUI";
 		public const string EndScene = "end";
 
+		// The map chosen in the menu (scene name).
+		public static string Map = RaceScene;
+		public static string MapName => Map == CityScene ? "NEON CITY" : "GOLDEN PILLARS";
+
+		// Best solo time for the current map, kept in the settings file (not the registry).
 		public static float BestSoloTime
 		{
-			get => PlayerPrefs.GetFloat("GliderJam.BestSolo", 0f);
-			set { PlayerPrefs.SetFloat("GliderJam.BestSolo", value); PlayerPrefs.Save(); }
+			get => Map == CityScene ? GameConfig.Current.bestSoloCity : GameConfig.Current.bestSoloCanyon;
+			set
+			{
+				if (Map == CityScene) GameConfig.Current.bestSoloCity = value;
+				else GameConfig.Current.bestSoloCanyon = value;
+				GameConfig.Current.Save();
+			}
 		}
 
 		public static string FormatTime(float t)

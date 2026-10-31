@@ -1,0 +1,11 @@
+var sb = new System.Text.StringBuilder();
+System.Func<UnityEngine.RectTransform, string> wc = rt => { var c = new UnityEngine.Vector3[4]; rt.GetWorldCorners(c); return "x[" + c[0].x.ToString("F0") + ".." + c[2].x.ToString("F0") + "]"; };
+var view = UnityEngine.GameObject.Find("Viewport");
+var content = UnityEngine.GameObject.Find("Content");
+if (view == null) return "no settings open";
+sb.Append("viewport ").Append(wc((UnityEngine.RectTransform)view.transform)).Append(" content ").Append(wc((UnityEngine.RectTransform)content.transform)).Append(" contentPos=").Append(((UnityEngine.RectTransform)content.transform).anchoredPosition);
+var row = content.transform.GetChild(0) as UnityEngine.RectTransform;
+sb.Append(" row0 ").Append(wc(row));
+var label = row.GetChild(0) as UnityEngine.RectTransform;
+sb.Append(" label ").Append(wc(label)).Append(" labelText=").Append(label.GetComponent<TMPro.TextMeshProUGUI>().text).Append(" align=").Append(label.GetComponent<TMPro.TextMeshProUGUI>().alignment);
+return sb.ToString();

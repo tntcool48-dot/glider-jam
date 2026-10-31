@@ -4,6 +4,7 @@ using GliderJam.Flight;
 using GliderJam.FX;
 using GliderJam.UI;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
 using UnityEngine.SceneManagement;
 
@@ -36,6 +37,9 @@ namespace GliderJam.Race
 			public float finishTime;
 			public float respawnAt = -1f;
 			public Vector3 prevPos;
+			public Volume boostVolume;
+			public float rumbleUntil;
+			public float nextAlarm;
 		}
 
 		private readonly List<Player> _players = new List<Player>();
@@ -119,6 +123,8 @@ namespace GliderJam.Race
 				Rect vp = solo ? new Rect(0f, 0f, 1f, 1f) : (i == 0 ? new Rect(0f, 0.5f, 1f, 0.5f) : new Rect(0f, 0f, 1f, 0.5f));
 				cam.rect = vp;
 				cam.cullingMask = ~(1 << ViewLayer(1 - i)); // never see the other player's private view effects
+				hd.volumeLayerMask = 1 | (1 << ViewLayer(i));  // shared volumes + this player's boost effects
+				p.boostVolume = MakeBoostVolume(i);
 				if (i == 0) camGo.AddComponent<AudioListener>();
 				p.cam = camGo.AddComponent<FollowCamera>();
 				p.cam.target = p.glider;
@@ -144,6 +150,26 @@ namespace GliderJam.Race
 			_cams = cams.ToArray();
 			BuildRings();
 			_countdownEnd = Time.time + countdownSeconds + 1f;
+			_pause = new GameObject("Pause Menu").AddComponent<PauseMenu>();
+		}
+
+		private PauseMenu _pause;
+
+		// Per-player chromatic aberration + lens distortion that swell while boosting (on the player's view layer).
+		private static Volume MakeBoostVolume(int player)
+		{
+			var go = new GameObject("Boost FX P" + (player + 1)) { layer = ViewLayer(player) };
+			var profile = ScriptableObject.CreateInstance<VolumeProfile>();
+			var ca = profile.Add<ChromaticAberration>(true);
+			ca.intensity.value = 0.55f;
+			var ld = profile.Add<LensDistortion>(true);
+			ld.intensity.value = -0.12f;
+			var v = go.AddComponent<Volume>();
+			v.isGlobal = true;
+			v.priority = 20f;
+			v.weight = 0f;
+			v.sharedProfile = profile;
+			return v;
 		}
 
 		private FollowCamera[] _cams;
@@ -211,6 +237,26 @@ namespace GliderJam.Race
 					string label = "P" + (2 - i) + "  " + Mathf.RoundToInt(Vector3.Distance(pos, op)) + " m";
 					p.hud.UpdateOther(op, label, !o.glider.Crashed);
 				}
+
+				// Above the ceiling: warning + alarm, countdown to destruction.
+				bool oob = p.glider.OutOfBounds && !p.glider.Crashed;
+				p.hud.SetOutOfBounds(oob, p.glider.OutOfBoundsLeft, p.glider.ceilingGrace);
+				if (oob && Time.time >= p.nextAlarm)
+				{
+					p.nextAlarm = Time.time + 0.3f;
+					AudioSynth.Play(AudioSynth.Beep, 0.45f, 1.7f);
+					Rumble(i, p, 0.15f, 0.45f, 0.12f);
+				}
+
+				// Boost: lens effects swell and the pad hums.
+				float boostTarget = p.glider.Boosting && GameConfig.Current.chromaticAberration ? 1f : 0f;
+				p.boostVolume.weight = Mathf.MoveTowards(p.boostVolume.weight, boostTarget, Time.deltaTime * 3f);
+				if (p.glider.Boosting) Rumble(i, p, 0.05f, 0.12f, 0.1f);
+				if (p.rumbleUntil > 0f && Time.unscaledTime > p.rumbleUntil)
+				{
+					p.rumbleUntil = 0f;
+					GliderInput.Rumble(i, _players.Count == 1, 0f, 0f);
+				}
 			}
 			UpdateRings();
 
@@ -218,6 +264,17 @@ namespace GliderJam.Race
 			{
 				FinishRace();
 			}
+		}
+
+		private void Rumble(int i, Player p, float low, float high, float seconds)
+		{
+			GliderInput.Rumble(i, _players.Count == 1, low, high);
+			p.rumbleUntil = Mathf.Max(p.rumbleUntil, Time.unscaledTime + seconds);
+		}
+
+		private void OnDestroy()
+		{
+			UnityEngine.InputSystem.InputSystem.ResetHaptics();
 		}
 
 		private int Rank(int i)
@@ -275,6 +332,7 @@ namespace GliderJam.Race
 			{
 				p.hud.ShowMessage("", "CHECKPOINT " + p.nextCp + "/" + route.CheckpointCount, new Color(1f, 0.9f, 0.7f), 1f);
 				AudioSynth.Play(AudioSynth.Chime, 0.55f, i == 0 ? 1f : 1.12f);
+				Rumble(i, p, 0.25f, 0.2f, 0.12f);
 			}
 			if (!finish) return;
 
@@ -311,9 +369,13 @@ namespace GliderJam.Race
 		private void HandleCrash(GliderController g, Vector3 point, Vector3 velocity)
 		{
 			Player p = _players.Find(x => x.glider == g);
+			int i = _players.IndexOf(p);
 			CrashFX.Spawn(fx, point, velocity, g.transform.Find("Visual"), _cams);
 			p.cam.OnTargetCrashed(point);
-			p.hud.ShowMessage("CRASHED", "respawning at last checkpoint", new Color(1f, 0.4f, 0.3f), respawnDelay);
+			p.hud.SetOutOfBounds(false, 0f, 1f);
+			bool outOfBounds = point.y > route.ceiling;
+			p.hud.ShowMessage(outOfBounds ? "OUT OF BOUNDS" : "CRASHED", "respawning at last checkpoint", new Color(1f, 0.4f, 0.3f), respawnDelay);
+			Rumble(i, p, 1f, 1f, 0.55f);
 			p.respawnAt = Time.time + respawnDelay;
 		}
 

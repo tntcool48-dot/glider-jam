@@ -49,7 +49,7 @@ namespace GliderJam.FX
 				a.spatialBlend = 0.7f;
 				a.minDistance = 60f;
 				a.maxDistance = 2000f;
-				a.volume = 1f;
+				a.volume = GameConfig.Current.effectsVolume;
 				a.Play();
 			}
 		}
@@ -95,6 +95,7 @@ namespace GliderJam.FX
 		private static ParticleSystem Burst(Transform parent, Material mat, string name, int count, Vector2 size, Vector2 life, Vector2 speed,
 			float radius, Gradient color, float delay, ParticleSystemRenderMode mode, float gravity)
 		{
+			count = Mathf.RoundToInt(count * new[] { 0.4f, 0.7f, 1f }[Mathf.Clamp(GameConfig.Current.effects, 0, 2)]);
 			var go = new GameObject(name);
 			go.transform.SetParent(parent, false);
 			var ps = go.AddComponent<ParticleSystem>();

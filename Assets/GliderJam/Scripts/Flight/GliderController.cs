@@ -3,41 +3,43 @@ using UnityEngine;
 
 namespace GliderJam.Flight
 {
-	// Arcade sailplane flight: bank-to-turn, pitch, speed that rises in dives and falls in climbs,
-	// boost (limited energy) and air brake, a soft flight ceiling, crash on terrain / obstacles.
-	// Inputs are set each frame by a driver (player input or autopilot).
+	// Flight model in the style of the original game: constant cruise speed (boost / brake only nudge it),
+	// W/S pitch the nose, A/D turn the nose and roll the glider into the turn. Holding a turn keeps rolling
+	// further, up to a hard 90 degree cap, and the turn tightens as it banks; releasing levels it out.
+	// Flying above the ceiling starts a short countdown; staying up there ends in an explosion.
 	[RequireComponent(typeof(Rigidbody))]
 	public class GliderController : MonoBehaviour
 	{
-		[Header("Speeds (m/s)")]
-		public float cruiseSpeed = 100f;
-		public float boostSpeed = 150f;
-		public float brakeSpeed = 62f;
-		public float acceleration = 22f;
-		public float deceleration = 30f;
+		[Header("Speed (m/s)")]
+		public float cruiseSpeed = 110f;
+		public float boostSpeed = 145f;
+		public float brakeSpeed = 80f;
+		public float speedChange = 30f;
 
 		[Header("Handling")]
-		public float pitchRate = 62f;
-		public float maxPitch = 70f;
-		public float maxBank = 70f;
-		public float bankResponse = 4.5f;
-		public float turnRate = 62f;
-		public float rudderRate = 12f;
+		public float pitchRate = 55f;
+		public float maxPitch = 80f;
+		public float turnRate = 32f;       // nose turn at full input, wings level
+		public float bankTurnRate = 44f;   // extra turn at a 90 degree roll
+		public float maxRoll = 90f;
+		public float rollRate = 80f;       // how fast the roll builds while turning
+		public float rollReturnRate = 120f;
 
 		[Header("Boost")]
 		public float boostDrain = 0.28f;
 		public float boostRecharge = 0.11f;
 
-		[Header("Limits")]
+		[Header("Out of bounds")]
 		public float ceiling = 288f;
+		public float ceilingGrace = 2f;
 
 		// Inputs (set by the driver)
-		[NonSerialized] public float inputPitch, inputRoll;
+		[NonSerialized] public float inputPitch, inputTurn;
 		[NonSerialized] public bool inputBoost, inputBrake;
 
 		public int PlayerIndex { get; set; }
 		public float Speed { get; private set; }
-		public float Bank { get; private set; }
+		public float Roll { get; private set; }      // degrees, + = right wing down
 		public float PitchAngle { get; private set; }
 		public float Yaw { get; private set; }
 		public float BoostEnergy { get; private set; } = 1f;
@@ -45,7 +47,11 @@ namespace GliderJam.Flight
 		public bool Crashed { get; private set; }
 		public bool Frozen { get; set; }
 		public float Ghost { get; private set; }
+		public float OutOfBoundsTime { get; private set; }
+		public float OutOfBoundsLeft => Mathf.Max(0f, ceilingGrace - OutOfBoundsTime);
+		public bool OutOfBounds => OutOfBoundsTime > 0f;
 		public float SpeedNormalized => Mathf.InverseLerp(brakeSpeed, boostSpeed, Speed);
+		public float Load => Mathf.Abs(Roll) / maxRoll * 0.6f + Mathf.Abs(inputPitch) * 0.5f;
 
 		public event Action<GliderController, Vector3, Vector3> OnCrash;
 
@@ -72,7 +78,7 @@ namespace GliderJam.Flight
 			Vector3 e = rot.eulerAngles;
 			Yaw = e.y;
 			PitchAngle = -Mathf.DeltaAngle(0f, e.x);
-			Bank = -Mathf.DeltaAngle(0f, e.z);
+			Roll = -Mathf.DeltaAngle(0f, e.z);
 		}
 
 		private void FixedUpdate()
@@ -85,65 +91,51 @@ namespace GliderJam.Flight
 			}
 			if (Crashed || Frozen)
 			{
-				if (Frozen && !Crashed)
-				{
-					_rb.linearVelocity = Vector3.zero;
-				}
+				if (Frozen && !Crashed) _rb.linearVelocity = Vector3.zero;
 				return;
 			}
 
-			// Speed: boost / brake / cruise, plus gravity trade (dive faster, climb slower).
+			// Constant speed; boost and brake just shift it.
 			Boosting = inputBoost && BoostEnergy > 0.02f;
 			BoostEnergy = Mathf.Clamp01(BoostEnergy + (Boosting ? -boostDrain : boostRecharge) * dt);
 			float target = Boosting ? boostSpeed : inputBrake ? brakeSpeed : cruiseSpeed;
-			target += -PitchAngle * 0.45f;
-			Speed = Mathf.MoveTowards(Speed, target, (target > Speed ? acceleration : deceleration) * dt);
+			Speed = Mathf.MoveTowards(Speed, target, speedChange * dt);
 
-			// Attitude: roll input sets the bank target, bank turns the glider; pitch input changes pitch angle.
-			float bankTarget = inputRoll * maxBank;
-			Bank = Mathf.Lerp(Bank, bankTarget, 1f - Mathf.Exp(-bankResponse * dt));
-			Yaw += (turnRate * (Bank / maxBank) + rudderRate * inputRoll) * dt;
-			float pitchTarget = PitchAngle + inputPitch * pitchRate * dt;
-			if (Mathf.Abs(inputPitch) < 0.05f)
-			{
-				pitchTarget = Mathf.MoveTowards(pitchTarget, 0f, 20f * dt); // hands-off: return to level flight
-			}
-			PitchAngle = Mathf.Clamp(pitchTarget, -maxPitch, maxPitch);
+			// Turning rolls the glider (building up to the 90 degree cap); the nose turns faster as it banks.
+			float rollTarget = inputTurn * maxRoll;
+			bool building = Mathf.Abs(rollTarget) > Mathf.Abs(Roll) && Mathf.Sign(rollTarget) == Mathf.Sign(Roll == 0f ? rollTarget : Roll);
+			Roll = Mathf.MoveTowards(Roll, rollTarget, (building ? rollRate : rollReturnRate) * dt);
+			Roll = Mathf.Clamp(Roll, -maxRoll, maxRoll);
+			Yaw += (turnRate * inputTurn + bankTurnRate * Mathf.Sin(Roll * Mathf.Deg2Rad)) * dt;
+			PitchAngle = Mathf.Clamp(PitchAngle + inputPitch * pitchRate * dt, -maxPitch, maxPitch);
 
-			// Soft ceiling: nose is pushed down near the cloud base, altitude is clamped.
-			float y = _rb.position.y;
-			float over = Mathf.InverseLerp(ceiling - 25f, ceiling, y);
-			if (over > 0f)
-			{
-				PitchAngle = Mathf.Min(PitchAngle, Mathf.Lerp(maxPitch, -8f, over));
-			}
-
-			Quaternion rot = Quaternion.Euler(-PitchAngle, Yaw, -Bank);
+			Quaternion rot = Quaternion.Euler(-PitchAngle, Yaw, -Roll);
 			_rb.MoveRotation(rot);
-			Vector3 vel = rot * Vector3.forward * Speed;
-			if (y > ceiling && vel.y > 0f)
+			_rb.linearVelocity = Vector3.Lerp(_rb.linearVelocity, rot * Vector3.forward * Speed, 1f - Mathf.Exp(-20f * dt));
+
+			// Above the ceiling: short countdown, then the glider is destroyed.
+			if (_rb.position.y > ceiling && Ghost <= 0f)
 			{
-				vel.y = 0f;
+				OutOfBoundsTime += dt;
+				if (OutOfBoundsTime >= ceilingGrace) Crash(_rb.position);
 			}
-			_rb.linearVelocity = Vector3.Lerp(_rb.linearVelocity, vel, 1f - Mathf.Exp(-9f * dt));
+			else
+			{
+				OutOfBoundsTime = 0f;
+			}
 		}
 
 		private void OnCollisionEnter(Collision collision)
 		{
-			if (Crashed || Ghost > 0f || collision.collider.GetComponentInParent<GliderController>() != null)
-			{
-				return;
-			}
+			if (Crashed || Ghost > 0f || collision.collider.GetComponentInParent<GliderController>() != null) return;
 			Crash(collision.GetContact(0).point);
 		}
 
 		public void Crash(Vector3 point)
 		{
-			if (Crashed)
-			{
-				return;
-			}
+			if (Crashed) return;
 			Crashed = true;
+			OutOfBoundsTime = 0f;
 			Vector3 v = _rb.linearVelocity;
 			_rb.isKinematic = true;
 			foreach (Collider c in _colliders) c.enabled = false;
@@ -157,8 +149,9 @@ namespace GliderJam.Flight
 			_rb.rotation = rotation;
 			transform.SetPositionAndRotation(position, rotation);
 			SetOrientation(rotation);
-			Bank = 0f;
+			Roll = 0f;
 			Speed = cruiseSpeed;
+			OutOfBoundsTime = 0f;
 			_rb.linearVelocity = rotation * Vector3.forward * Speed;
 			foreach (Collider c in _colliders) c.enabled = true;
 			Crashed = false;

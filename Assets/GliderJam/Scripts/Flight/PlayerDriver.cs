@@ -21,7 +21,7 @@ namespace GliderJam.Flight
 		{
 			_input.Update(Time.deltaTime);
 			_glider.inputPitch = _input.Pitch;
-			_glider.inputRoll = _input.Roll;
+			_glider.inputTurn = _input.Turn;
 			_glider.inputBoost = _input.Boost;
 			_glider.inputBrake = _input.Brake;
 		}

@@ -39,14 +39,15 @@ namespace GliderJam.Flight
 		{
 			bool alive = !_glider.Crashed && !_glider.Frozen;
 			float s = _glider.SpeedNormalized;
+			float wind = masterVolume * GameConfig.Current.windVolume, fx = masterVolume * GameConfig.Current.effectsVolume;
 			float dt = Time.deltaTime;
-			_wind.volume = alive ? Mathf.Lerp(0.12f, 0.45f, s) * masterVolume : Mathf.MoveTowards(_wind.volume, 0f, dt);
+			_wind.volume = alive ? Mathf.Lerp(0.12f, 0.45f, s) * wind : Mathf.MoveTowards(_wind.volume, 0f, dt);
 			_wind.pitch = Mathf.Lerp(0.85f, 1.25f, s);
-			float turn = Mathf.Abs(_glider.Bank) / _glider.maxBank;
-			_air.volume = alive ? Mathf.Lerp(0.04f, 0.3f, s * 0.7f + turn * 0.3f) * masterVolume : 0f;
+			float turn = Mathf.Abs(_glider.Roll) / _glider.maxRoll;
+			_air.volume = alive ? Mathf.Lerp(0.04f, 0.3f, s * 0.7f + turn * 0.3f) * wind : 0f;
 			_air.pitch = Mathf.Lerp(0.7f, 1.35f, s);
 			_motorLevel = Mathf.MoveTowards(_motorLevel, alive && _glider.Boosting ? 1f : 0f, dt * (_glider.Boosting ? 2.5f : 1.2f));
-			_motor.volume = _motorLevel * 0.22f * masterVolume;
+			_motor.volume = _motorLevel * 0.22f * fx;
 			_motor.pitch = Mathf.Lerp(0.55f, 1.35f, _motorLevel) * Mathf.Lerp(0.95f, 1.1f, s);
 		}
 	}
