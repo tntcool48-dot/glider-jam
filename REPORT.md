@@ -20,7 +20,7 @@ benchmark logs `F:\glider_jam\Build\Benchmarks`). Unity 6000.3.18f1, HDRP 17.3, 
 | Free music | 3 tracks by Kevin MacLeod (CC BY 4.0), cross-faded: menu, canyon, city | `Audio/`, `MUSIC_CREDITS.md` |
 | Great-looking UI | New UI kit (Rajdhani font, rounded panels, accent bars), settings screen, pause menu, out-of-bounds warning, full-route minimap, map name on the results | `Scripts/UI/` |
 | Outer terrain: keep it, optimize, measure | Kept. Outer chunks never cast shadows and have no colliders; "Distant landscape" setting (Off / Low / High). Measured below | `World/MeshTerrain.cs` |
-| Make the canyon look better | Done: river over the valley floor, circling bird flocks, sunlit dust motes, drifting 3D-noise mist, sharper cumulus. Not done: waterfalls, vines, denser pillar-top forest, second rock texture (see "Not done") | `World/CanyonAmbience.cs`, `Editor/CanyonSetup.cs` |
+| Make the canyon look better | Done: river over the valley floor, seven waterfalls spilling off pillar lips beside the race line, circling bird flocks, sunlit dust motes, drifting 3D-noise mist, sharper cumulus. Not done: vines, denser pillar-top forest, second rock texture (see "Not done") | `World/CanyonAmbience.cs`, `Editor/CanyonSetup.cs` |
 
 ## Neon City
 
@@ -40,7 +40,10 @@ benchmark logs `F:\glider_jam\Build\Benchmarks`). Unity 6000.3.18f1, HDRP 17.3, 
 
 ## Benchmarks (1920x1080 fullscreen, autopilot race, vsync off)
 
-BENCHMARKS_PLACEHOLDER
+The full matrix is in `F:\glider_jam\Build\Benchmarks\summary.md` (written when the suite finishes; per-run logs alongside).
+First results: canyon split-screen Low 312.6 fps avg (1% low 50.8), Medium 182.5 fps (1% low 52.9).
+The canyon split High run wrote no log (check `canyon_split_high.log`; rerun with `Tools\cli\bench.ps1 -Name canyon_split_high -Preset High`).
+Earlier build, split-screen High: about 130 fps average.
 
 ## Downloads (this round)
 
@@ -81,8 +84,8 @@ Ideas for the CLI
 
 ## Not done / known issues
 
-- Canyon: waterfalls, vines, denser pillar-top forest and a second rock texture were not built this round
-  (the river, birds, dust, mist and clouds were prioritised).
+- Canyon: vines, a denser pillar-top forest and a second rock texture were not built this round
+  (river, waterfalls, birds, dust, mist and clouds came first).
 - Ray tracing does not include the instanced trees or volumetric clouds in the acceleration structure; shadows stay
   raster (PCSS).
 - The results screen always flies over the canyon, also after a city race.
