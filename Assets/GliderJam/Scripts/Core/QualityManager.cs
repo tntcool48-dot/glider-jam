@@ -31,6 +31,7 @@ namespace GliderJam
 			DontDestroyOnLoad(go);
 			Instance = go.AddComponent<QualityManager>();
 			go.AddComponent<Audio.MusicPlayer>();
+			go.AddComponent<UI.FpsCounter>();
 			Benchmark.ApplyCommandLineOverrides(GameConfig.Current);
 		}
 
@@ -98,10 +99,18 @@ namespace GliderJam
 #endif
 		}
 
+		// Ray tracing on the canyon in split-screen overwhelms the GPU driver (two views tracing into the layered terrain
+		// material: single-digit fps, failed pipeline builds on an RX 7900 XT). Screen-space effects stand in there;
+		// solo races, the city and the menu flyover keep ray tracing.
+		public static bool RayTracingAllowed =>
+			!(GameSettings.Mode == GameMode.SplitScreen && !GameSettings.Showcase && SceneManager.GetActiveScene().name == GameSettings.RaceScene);
+
+		private static bool RT(int setting) => setting == 2 && RayTracingAllowed;
+
 		// Low -> Performant, Medium -> Balanced, High/Ultra/Custom -> High Fidelity, any ray traced option -> Ultra RT.
 		private static void ApplyQualityLevel(GameConfig cfg)
 		{
-			string want = cfg.UsesRayTracing ? "Ultra RT"
+			string want = cfg.UsesRayTracing && RayTracingAllowed ? "Ultra RT"
 				: cfg.preset == QualityPreset.Low ? "Performant"
 				: cfg.preset == QualityPreset.Medium ? "Balanced"
 				: "High Fidelity";
@@ -147,19 +156,19 @@ namespace GliderJam
 			contact.quality.Override(2);
 
 			var ao = Get<ScreenSpaceAmbientOcclusion>();
-			ao.rayTracing.Override(cfg.ambientOcclusion == 2);
-			ao.quality.Override(cfg.ambientOcclusion == 2 ? 2 : 1);
+			ao.rayTracing.Override(RT(cfg.ambientOcclusion));
+			ao.quality.Override(RT(cfg.ambientOcclusion) ? 2 : 1);
 
 			var ssr = Get<ScreenSpaceReflection>();
 			ssr.enabled.Override(cfg.reflections > 0);
 			ssr.enabledTransparent.Override(cfg.reflections > 0);
-			ssr.tracing.Override(cfg.reflections == 2 ? RayCastingMode.RayTracing : RayCastingMode.RayMarching);
-			ssr.quality.Override(cfg.reflections == 2 ? 2 : 1);
+			ssr.tracing.Override(RT(cfg.reflections) ? RayCastingMode.RayTracing : RayCastingMode.RayMarching);
+			ssr.quality.Override(RT(cfg.reflections) ? 2 : 1);
 
 			var gi = Get<GlobalIllumination>();
 			gi.enable.Override(cfg.globalIllumination > 0);
-			gi.tracing.Override(cfg.globalIllumination == 2 ? RayCastingMode.RayTracing : RayCastingMode.RayMarching);
-			gi.quality.Override(cfg.globalIllumination == 2 ? 1 : 2);
+			gi.tracing.Override(RT(cfg.globalIllumination) ? RayCastingMode.RayTracing : RayCastingMode.RayMarching);
+			gi.quality.Override(RT(cfg.globalIllumination) ? 1 : 2);
 
 			var mb = Get<MotionBlur>();
 			if (cfg.motionBlur) mb.intensity.overrideState = false; else mb.intensity.Override(0f);
@@ -184,7 +193,7 @@ namespace GliderJam
 			Set(hd, FrameSettingsField.DepthOfField, cfg.depthOfField);
 			Set(hd, FrameSettingsField.LensFlareDataDriven, cfg.lensFlare);
 			Set(hd, FrameSettingsField.Water, cfg.water > 0);
-			Set(hd, FrameSettingsField.RayTracing, cfg.UsesRayTracing);
+			Set(hd, FrameSettingsField.RayTracing, cfg.UsesRayTracing && RayTracingAllowed);
 			hd.antialiasing = cfg.antiAliasing == 0 ? HDAdditionalCameraData.AntialiasingMode.None
 				: cfg.antiAliasing == 1 ? HDAdditionalCameraData.AntialiasingMode.FastApproximateAntialiasing
 				: cfg.antiAliasing == 2 ? HDAdditionalCameraData.AntialiasingMode.SubpixelMorphologicalAntiAliasing

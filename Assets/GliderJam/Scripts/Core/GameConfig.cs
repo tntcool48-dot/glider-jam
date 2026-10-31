@@ -76,6 +76,7 @@ namespace GliderJam
 		public bool chromaticAberration = true;
 		public bool cameraShake = true;
 		public bool speedEffects = true;
+		public bool showFps;           // frame-rate readout, top-left
 
 		// ---- controls
 		public PlayerControls[] players = DefaultPlayers();

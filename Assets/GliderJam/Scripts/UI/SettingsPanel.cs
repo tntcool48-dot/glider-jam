@@ -216,6 +216,7 @@ namespace GliderJam.UI
 			Choice("FRAME LIMIT", caps.Select(c => c == 0 ? "UNLIMITED" : c + " FPS").ToArray(), () => Mathf.Max(0, Array.IndexOf(caps, Cfg.frameCap)), i => { Cfg.frameCap = caps[i]; Cfg.Commit(); });
 			Slider("RENDER SCALE", 50f, 100f, () => Cfg.renderScale, v => { Cfg.renderScale = Mathf.RoundToInt(v); Cfg.preset = QualityPreset.Custom; Cfg.Commit(); }, v => Mathf.RoundToInt(v) + "%", true);
 			Choice("UPSCALER", new[] { "CATMULL-ROM", "TAA UPSCALE", "AMD FSR 1" }, () => Cfg.upscaler, i => { Cfg.upscaler = i; Cfg.Commit(); });
+			Choice("FPS COUNTER", OffOn, () => Cfg.showFps ? 1 : 0, i => { Cfg.showFps = i == 1; Cfg.Commit(); });
 		}
 
 		private void BuildAudio()
