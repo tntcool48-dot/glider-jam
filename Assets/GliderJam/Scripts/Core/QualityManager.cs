@@ -141,8 +141,10 @@ namespace GliderJam
 			var shadows = Get<HDShadowSettings>();
 			shadows.maxShadowDistance.Override(new[] { 250f, 700f, 1200f, 1600f, 2600f }[Mathf.Clamp(cfg.shadows, 0, 4)]);
 			shadows.cascadeShadowSplitCount.Override(new[] { 1, 2, 3, 4, 4 }[Mathf.Clamp(cfg.shadows, 0, 4)]);
+			// Contact shadows speckle on the thin wings at low sample counts: Ultra only, with more samples.
 			var contact = Get<ContactShadows>();
-			contact.enable.Override(cfg.shadows >= 3);
+			contact.enable.Override(cfg.shadows >= 4);
+			contact.quality.Override(2);
 
 			var ao = Get<ScreenSpaceAmbientOcclusion>();
 			ao.rayTracing.Override(cfg.ambientOcclusion == 2);
@@ -176,7 +178,7 @@ namespace GliderJam
 			Set(hd, FrameSettingsField.SSR, cfg.reflections > 0);
 			Set(hd, FrameSettingsField.TransparentSSR, cfg.reflections > 0);
 			Set(hd, FrameSettingsField.SSGI, cfg.globalIllumination > 0);
-			Set(hd, FrameSettingsField.ContactShadows, cfg.shadows >= 3);
+			Set(hd, FrameSettingsField.ContactShadows, cfg.shadows >= 4);
 			Set(hd, FrameSettingsField.MotionBlur, cfg.motionBlur);
 			Set(hd, FrameSettingsField.FilmGrain, cfg.filmGrain);
 			Set(hd, FrameSettingsField.DepthOfField, cfg.depthOfField);

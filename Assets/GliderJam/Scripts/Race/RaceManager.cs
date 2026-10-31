@@ -95,6 +95,7 @@ namespace GliderJam.Race
 				p.visuals = go.AddComponent<GliderVisuals>();
 				p.visuals.trailMaterial = fx.trail;
 				p.visuals.vaporMaterial = fx.vapor;
+				p.visuals.puffMaterial = fx.wingVapor != null ? fx.wingVapor : fx.smoke;
 				p.visuals.playerColor = GameSettings.PlayerColors[i];
 				if ((i < autopilot.Length && autopilot[i]) || Benchmark.Active)
 				{
@@ -424,6 +425,7 @@ namespace GliderJam.Race
 				var v = go.AddComponent<GliderVisuals>();
 				v.trailMaterial = fx.trail;
 				v.vaporMaterial = fx.vapor;
+				v.puffMaterial = fx.wingVapor != null ? fx.wingVapor : fx.smoke;
 				v.playerColor = GameSettings.PlayerColors[i];
 				var ap = go.AddComponent<AutopilotDriver>();
 				ap.route = route;

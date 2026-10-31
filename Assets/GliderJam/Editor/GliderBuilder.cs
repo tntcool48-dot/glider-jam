@@ -35,9 +35,12 @@ namespace GliderJam.EditorTools
 			string tag = "P" + (player + 1);
 			Texture2D bodyLivery = LiveryTexture(accent, player + 1, false, Dir + "/Livery_Fuselage_" + tag + ".png");
 			Texture2D finLivery = LiveryTexture(accent, player + 1, true, Dir + "/Livery_Fin_" + tag + ".png");
+			Texture2D bodyNormal = NormalFromGrooves(1024, 2048, FuselageGroove, Dir + "/Panels_Fuselage_N.png", false);
+			Texture2D wingPanels = WingPanelTexture(out Texture2D wingNormal);
 
 			Material white = Lit("Paint_White", new Color(0.93f, 0.93f, 0.93f), 0.86f, 0f, true, null);
-			Material bodyMat = Lit("Paint_Fuselage_" + tag, Color.white, 0.86f, 0f, true, bodyLivery);
+			Material wingMat = WithNormal(Lit("Paint_Wing", Color.white, 0.86f, 0f, true, wingPanels), wingNormal, 1f);
+			Material bodyMat = WithNormal(Lit("Paint_Fuselage_" + tag, Color.white, 0.86f, 0f, true, bodyLivery), bodyNormal, 1f);
 			Material finMat = Lit("Paint_Fin_" + tag, Color.white, 0.86f, 0f, true, finLivery);
 			Material accentMat = Lit("Paint_Accent_" + tag, accent, 0.82f, 0.25f, true, null);
 			Material interior = Lit("Cockpit_Interior", new Color(0.035f, 0.037f, 0.04f), 0.35f, 0f, false, null);
@@ -64,10 +67,10 @@ namespace GliderJam.EditorTools
 			{
 				string s = side < 0 ? "L" : "R";
 				WingMeshes(side, out Mesh main, out Mesh aileron, out Mesh tip, out Vector3 hingeA, out Vector3 hingeB, out Vector3 tipPoint, out Vector3 navPoint);
-				Add(visual, "Wing" + s, Save(main, "Wing" + s), white);
+				Add(visual, "Wing" + s, Save(main, "Wing" + s), wingMat);
 				Add(visual, "WingTip" + s, Save(tip, "WingTip" + s), accentMat);
 				Transform pivot = Pivot(visual, "Aileron" + s + "_Pivot", hingeA, hingeB);
-				Add(pivot, "Aileron" + s, Save(ToLocal(aileron, pivot), "Aileron" + s), white);
+				Add(pivot, "Aileron" + s, Save(ToLocal(aileron, pivot), "Aileron" + s), wingMat);
 				var tipAnchor = new GameObject("TipTrail" + s).transform;
 				tipAnchor.SetParent(visual, false);
 				tipAnchor.localPosition = tipPoint;
@@ -154,7 +157,17 @@ namespace GliderJam.EditorTools
 			var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
 			if (existing != null)
 			{
-				EditorUtility.CopySerialized(m, existing);
+				// Copy through the Mesh API: EditorUtility.CopySerialized leaves the Editor's GPU copy stale.
+				existing.Clear();
+				existing.indexFormat = m.indexFormat;
+				existing.SetVertices(m.vertices);
+				existing.SetNormals(m.normals);
+				existing.SetUVs(0, m.uv);
+				if (m.tangents.Length == m.vertexCount) existing.SetTangents(m.tangents);
+				existing.subMeshCount = m.subMeshCount;
+				for (int s = 0; s < m.subMeshCount; s++) existing.SetTriangles(m.GetTriangles(s), s);
+				existing.RecalculateBounds();
+				EditorUtility.SetDirty(existing);
 				return existing;
 			}
 			AssetDatabase.CreateAsset(m, path);
@@ -365,6 +378,7 @@ namespace GliderJam.EditorTools
 			for (int i = (x0 <= 0f ? 1 : 0); i < xs.Count; i++) loop.Add((xs[i], true));
 
 			var v = new List<Vector3>();
+			var uvs = new List<Vector2>();
 			var tris = new List<int>();
 			var pts = new Vector3[st.Count, loop.Count];
 			for (int s = 0; s < st.Count; s++)
@@ -377,7 +391,15 @@ namespace GliderJam.EditorTools
 				}
 			}
 			int n = loop.Count;
-			for (int s = 0; s < st.Count; s++) for (int j = 0; j < n; j++) v.Add(pts[s, j]);
+			// Panel UVs: u = span (|x| / WingUSpan), v = chord fraction, lower surface 0..0.5 (TE -> LE), upper 0.5..1.
+			for (int s = 0; s < st.Count; s++)
+			{
+				for (int j = 0; j < n; j++)
+				{
+					v.Add(pts[s, j]);
+					uvs.Add(new Vector2(Mathf.Abs(st[s].le.x) / WingUSpan, loop[j].upper ? 0.5f + 0.5f * loop[j].x : 0.5f - 0.5f * loop[j].x));
+				}
+			}
 			for (int s = 0; s < st.Count - 1; s++)
 			{
 				for (int j = 0; j < n - 1; j++)
@@ -388,6 +410,7 @@ namespace GliderJam.EditorTools
 			}
 			var mesh = new Mesh();
 			mesh.SetVertices(v);
+			mesh.SetUVs(0, uvs);
 			mesh.SetTriangles(tris, 0);
 			mesh.RecalculateNormals();
 			FixOrientation(mesh, st);
@@ -726,13 +749,162 @@ namespace GliderJam.EditorTools
 
 		private static Material Glass()
 		{
-			var m = Lit("Canopy_Glass", new Color(0.05f, 0.07f, 0.09f, 0.45f), 0.97f, 0f, false, null);
+			var m = Lit("Canopy_Glass", new Color(0.04f, 0.06f, 0.08f, 0.4f), 0.985f, 0f, false, null);
 			m.SetFloat("_SurfaceType", 1f);
 			m.SetFloat("_BlendMode", 0f);
 			m.SetFloat("_EnableBlendModePreserveSpecularLighting", 1f);
 			m.SetFloat("_DoubleSidedEnable", 1f);
+			// Sky, terrain and the other glider reflect in the canopy (SSR on transparents, ray traced on Ultra RT).
+			m.SetFloat("_ReceivesSSRTransparent", 1f);
+			m.SetFloat("_EnableFogOnTransparent", 1f);
 			UnityEditor.Rendering.HighDefinition.HDShaderUtils.ResetMaterialKeywords(m);
 			return m;
+		}
+
+		private static Material WithNormal(Material m, Texture2D normal, float scale)
+		{
+			m.SetTexture("_NormalMap", normal);
+			m.SetFloat("_NormalScale", scale);
+			UnityEditor.Rendering.HighDefinition.HDShaderUtils.ResetMaterialKeywords(m);
+			EditorUtility.SetDirty(m);
+			return m;
+		}
+
+		// ================================================================ panel lines
+
+		private const float WingUSpan = 7.6f;
+
+		// Groove coverage (0..1) of a line at distance d (m) with the given half width.
+		private static float Groove(float d, float half = 0.007f)
+		{
+			float c = Mathf.Clamp01(1f - Mathf.Abs(d) / half);
+			return c * c * (3f - 2f * c);
+		}
+
+		private static float RectOutline(float x, float y, float x0, float x1, float y0, float y1)
+		{
+			if (x < x0 - 0.02f || x > x1 + 0.02f || y < y0 - 0.02f || y > y1 + 0.02f) return 0f;
+			float g = 0f;
+			if (y > y0 && y < y1) g = Mathf.Max(g, Mathf.Max(Groove(x - x0), Groove(x - x1)));
+			if (x > x0 && x < x1) g = Mathf.Max(g, Mathf.Max(Groove(y - y0), Groove(y - y1)));
+			return g;
+		}
+
+		private static float WingChord(float x)
+		{
+			float s = Mathf.Clamp01((x - 0.22f) / (7.35f - 0.22f));
+			return s < 0.55f ? Mathf.Lerp(0.95f, 0.72f, s / 0.55f) : Mathf.Lerp(0.72f, 0.40f, (s - 0.55f) / 0.45f);
+		}
+
+		// Wing panel lines in panel UV space: root joint, D-box seam, upper-surface airbrake box, lower hatches.
+		private static float WingGroove(float u, float v)
+		{
+			float x = u * WingUSpan;
+			bool upper = v >= 0.5f;
+			float c = upper ? (v - 0.5f) * 2f : (0.5f - v) * 2f; // chord fraction
+			float chord = WingChord(x);
+			float cm = c * chord; // meters from the leading edge
+			float g = Groove(x - 0.85f);
+			if (x > 0.85f && x < 6.75f) g = Mathf.Max(g, 0.6f * Groove(cm - 0.18f * chord));
+			if (upper)
+			{
+				g = Mathf.Max(g, RectOutline(x, cm, 1.7f, 3.1f, 0.50f * chord, 0.50f * chord + 0.055f));
+				g = Mathf.Max(g, RectOutline(x, cm, 0.95f, 1.25f, 0.30f * chord, 0.42f * chord));
+			}
+			else
+			{
+				foreach (float hx in new[] { 1.4f, 3.2f, 5.0f })
+				{
+					float r = Mathf.Sqrt((x - hx) * (x - hx) + (cm - 0.40f * chord) * (cm - 0.40f * chord));
+					g = Mathf.Max(g, Groove(r - 0.055f));
+				}
+				g = Mathf.Max(g, RectOutline(x, cm, 2.2f, 2.45f, 0.24f * chord, 0.33f * chord));
+			}
+			return g;
+		}
+
+		// Fuselage panel lines (u = around, 0 top; v = along, nose at 1): section joints, wheel doors, hatches, vents.
+		private static float FuselageGroove(float u, float v)
+		{
+			float zNose = Profile[0, 0], zTail = Profile[Profile.GetLength(0) - 1, 0];
+			float z = Mathf.Lerp(zTail, zNose, v);
+			Section(z, out float w, out float h, out _);
+			float circ = Mathf.PI * (w + h) * 1.05f;
+			float ang = u * 360f;
+			float aroundM = Mathf.DeltaAngle(0f, ang) / 360f * circ; // signed arc distance from the top line
+			float bottomM = Mathf.DeltaAngle(180f, ang) / 360f * circ;
+			float g = 0f;
+			foreach (float rz in new[] { 2.28f, -0.62f, -2.05f, -3.42f }) g = Mathf.Max(g, Groove(z - rz));
+			g = Mathf.Max(g, RectOutline(bottomM, z, -0.075f, 0.075f, -0.42f, 0.30f));   // wheel doors
+			g = Mathf.Max(g, Groove(bottomM) * (z > -0.42f && z < 0.30f ? 1f : 0f));
+			g = Mathf.Max(g, RectOutline(bottomM, z, -0.05f, 0.05f, 1.92f, 2.06f));      // tow hook hatch
+			g = Mathf.Max(g, RectOutline(aroundM, z, -0.09f, 0.09f, -1.30f, -1.05f));    // top access hatch
+			foreach (float side in new[] { 1f, -1f })
+			{
+				float sideM = Mathf.DeltaAngle(side * 72f, ang) / 360f * circ;
+				float r = Mathf.Sqrt(sideM * sideM + (z - 1.72f) * (z - 1.72f));
+				g = Mathf.Max(g, Groove(r - 0.03f));                                        // fresh-air vents
+			}
+			return g;
+		}
+
+		// Wing paint (white with faint panel lines) plus its normal map.
+		private static Texture2D WingPanelTexture(out Texture2D normal)
+		{
+			const int w = 2048, h = 1024;
+			string path = Dir + "/Panels_Wing.png";
+			var px = new Color[w * h];
+			Color white = new Color(0.93f, 0.93f, 0.93f);
+			for (int y = 0; y < h; y++)
+				for (int x = 0; x < w; x++)
+					px[y * w + x] = Color.Lerp(white, new Color(0.42f, 0.43f, 0.45f), WingGroove((x + 0.5f) / w, (y + 0.5f) / h));
+			var tex = new Texture2D(w, h, TextureFormat.RGBA32, true);
+			tex.SetPixels(px);
+			tex.Apply();
+			File.WriteAllBytes(path, tex.EncodeToPNG());
+			Object.DestroyImmediate(tex);
+			AssetDatabase.ImportAsset(path);
+			var ti = (TextureImporter)AssetImporter.GetAtPath(path);
+			ti.wrapMode = TextureWrapMode.Clamp;
+			ti.anisoLevel = 8;
+			ti.SaveAndReimport();
+			normal = NormalFromGrooves(w, h, WingGroove, Dir + "/Panels_Wing_N.png", true);
+			return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+		}
+
+		// Tangent-space normal map from a groove field (grooves are recessed).
+		private static Texture2D NormalFromGrooves(int w, int h, System.Func<float, float, float> groove, string path, bool clampU)
+		{
+			var height = new float[w * h];
+			for (int y = 0; y < h; y++)
+				for (int x = 0; x < w; x++)
+					height[y * w + x] = -groove((x + 0.5f) / w, (y + 0.5f) / h);
+			var px = new Color[w * h];
+			const float strength = 1.6f;
+			for (int y = 0; y < h; y++)
+			{
+				for (int x = 0; x < w; x++)
+				{
+					int xl = clampU ? Mathf.Max(0, x - 1) : (x - 1 + w) % w, xr = clampU ? Mathf.Min(w - 1, x + 1) : (x + 1) % w;
+					int yd = Mathf.Max(0, y - 1), yu = Mathf.Min(h - 1, y + 1);
+					float dx = (height[y * w + xr] - height[y * w + xl]) * strength;
+					float dy = (height[yu * w + x] - height[yd * w + x]) * strength;
+					Vector3 n = new Vector3(-dx, -dy, 1f).normalized;
+					px[y * w + x] = new Color(n.x * 0.5f + 0.5f, n.y * 0.5f + 0.5f, n.z * 0.5f + 0.5f, 1f);
+				}
+			}
+			var tex = new Texture2D(w, h, TextureFormat.RGBA32, true, true);
+			tex.SetPixels(px);
+			tex.Apply();
+			File.WriteAllBytes(path, tex.EncodeToPNG());
+			Object.DestroyImmediate(tex);
+			AssetDatabase.ImportAsset(path);
+			var ti = (TextureImporter)AssetImporter.GetAtPath(path);
+			ti.textureType = TextureImporterType.NormalMap;
+			ti.wrapMode = clampU ? TextureWrapMode.Clamp : TextureWrapMode.Repeat;
+			ti.anisoLevel = 8;
+			ti.SaveAndReimport();
+			return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
 		}
 
 		private static Material Emissive(string name, Color color, float nits)
@@ -749,7 +921,7 @@ namespace GliderJam.EditorTools
 		// both sides. Fin livery (u = chord either side, v = span): accent top band and the race number.
 		private static Texture2D LiveryTexture(Color accent, int number, bool fin, string path)
 		{
-			int w = fin ? 1024 : 2048, h = fin ? 1024 : 512;
+			int w = 1024, h = fin ? 1024 : 2048;
 			var px = new Color[w * h];
 			Color white = new Color(0.94f, 0.94f, 0.95f), dark = new Color(0.06f, 0.07f, 0.09f);
 			for (int y = 0; y < h; y++)
@@ -774,6 +946,7 @@ namespace GliderJam.EditorTools
 						c = Color.Lerp(c, accent, GliderJam.World.WorldNoise.SmoothStep(0.965f, 0.975f, v));
 						float glare = Smooth(18f - Mathf.Abs(Mathf.DeltaAngle(ang, 0f))) * Smooth((v - 0.885f) * 400f) * Smooth((0.965f - v) * 400f);
 						c = Color.Lerp(c, dark, glare * 0.9f);
+						c = Color.Lerp(c, c * 0.5f, FuselageGroove(u, v));
 					}
 					else
 					{

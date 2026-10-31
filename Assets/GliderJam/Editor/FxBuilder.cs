@@ -36,6 +36,7 @@ namespace GliderJam.EditorTools
 			}
 			lib.trail = Particle("FX_Trail", unlit, trailTex, 0f);
 			lib.vapor = Particle("FX_Vapor", unlit, trailTex, 0f);
+			lib.wingVapor = Particle("FX_WingVapor", unlit, puffTex, 0f);
 			lib.fire = Particle("FX_Fire", unlit, puffTex, 1f);
 			lib.spark = Particle("FX_Spark", unlit, sparkTex, 1f);
 			lib.smoke = Particle("FX_Smoke", lit, puffTex, 0f);

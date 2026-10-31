@@ -17,6 +17,7 @@ MonoBehaviour:
   - {fileID: 3298427707997077627, guid: 73ec58e305c17ff4b9facc50b4009027, type: 3}
   trail: {fileID: 2100000, guid: 47bbae7dd314bc44384be09a3f73c3ac, type: 2}
   vapor: {fileID: 2100000, guid: a22ff494aa62d9b48b5b56e773c4df8b, type: 2}
+  wingVapor: {fileID: 2100000, guid: 138291d3c9891cf44a047a672bcdede7, type: 2}
   fire: {fileID: 2100000, guid: 9820cd5d023b4594083d3d7c6fd2144c, type: 2}
   smoke: {fileID: 2100000, guid: b7207e77cc0b6354ab99d510f1e301af, type: 2}
   spark: {fileID: 2100000, guid: 53a7460fd8233d24a81261acc5b8d482, type: 2}

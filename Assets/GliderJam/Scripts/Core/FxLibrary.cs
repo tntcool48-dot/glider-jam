@@ -9,6 +9,7 @@ namespace GliderJam
 		public GameObject[] gliderPrefabs = new GameObject[2];
 		public Material trail;
 		public Material vapor;
+		public Material wingVapor;
 		public Material fire;
 		public Material smoke;
 		public Material spark;
