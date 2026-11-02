@@ -19,7 +19,7 @@ namespace GliderJam.Race
 		public int CheckpointCount => checkpoints.Length;
 		public float StartZ => path[0].z;
 		public float FinishZ => path[checkpoints[checkpoints.Length - 1]].z;
-		public float MinZ => StartZ - 250f; // flying back past the start is out of bounds
+		public float MinZ => StartZ - 250f; // flying back this far past the start turns the glider around
 		public float Width => float.IsInfinity(minX) || float.IsInfinity(maxX) ? 1000f : maxX - minX;
 
 		public bool InsideCourse(Vector3 p)

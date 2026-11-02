@@ -29,11 +29,15 @@ namespace GliderJam.Flight
 		public float boostDrain = 0.28f;
 		public float boostRecharge = 0.11f;
 
+		[Header("Close calls")]
+		public float closeCallRadius = 14f;     // skimming a wall, building or the ground this close...
+		public float closeCallRecharge = 0.55f; // ...refills boost this much faster per second
+
 		[Header("Out of bounds")]
 		public float ceiling = 288f;
 		public float ceilingGrace = 2f;
-		// Course limits (x sides, z behind the start): outside them counts like the ceiling.
-		public float minX = float.NegativeInfinity, maxX = float.PositiveInfinity, minZ = float.NegativeInfinity;
+		// Course sides: outside them counts like the ceiling.
+		public float minX = float.NegativeInfinity, maxX = float.PositiveInfinity;
 
 		// Inputs (set by the driver)
 		[NonSerialized] public float inputPitch, inputTurn;
@@ -46,6 +50,7 @@ namespace GliderJam.Flight
 		public float Yaw { get; private set; }
 		public float BoostEnergy { get; private set; } = 1f;
 		public bool Boosting { get; private set; }
+		public bool CloseCall { get; private set; }
 		public bool Crashed { get; private set; }
 		public bool Frozen { get; set; }
 		public float Ghost { get; private set; }
@@ -99,11 +104,13 @@ namespace GliderJam.Flight
 				return;
 			}
 
-			// Constant speed; boost and brake just shift it.
-			Boosting = inputBoost && BoostEnergy > 0.02f;
-			BoostEnergy = Mathf.Clamp01(BoostEnergy + (Boosting ? -boostDrain : boostRecharge) * dt);
+			// Constant speed; boost and brake just shift it. A burst (a stunt reward) boosts for free and kicks in faster.
+			_burst = Mathf.Max(0f, _burst - dt);
+			bool free = _burst > 0f;
+			Boosting = free || (inputBoost && BoostEnergy > 0.02f);
+			BoostEnergy = Mathf.Clamp01(BoostEnergy + (Boosting && !free ? -boostDrain : boostRecharge) * dt);
 			float target = Boosting ? boostSpeed : inputBrake ? brakeSpeed : cruiseSpeed;
-			Speed = Mathf.MoveTowards(Speed, target, speedChange * dt);
+			Speed = Mathf.MoveTowards(Speed, target, speedChange * (free ? 2f : 1f) * dt);
 
 			// Turning rolls the glider (building up to the 90 degree cap); the nose turns faster as it banks.
 			float rollTarget = inputTurn * maxRoll;
@@ -138,9 +145,22 @@ namespace GliderJam.Flight
 				}
 			}
 
+			// Close call: static world within reach (not while ghosted after a respawn). Checked every other physics step.
+			if (Ghost > 0f)
+			{
+				CloseCall = false;
+			}
+			else if ((++_nearStep & 1) == 0)
+			{
+				CloseCall = false;
+				int n = Physics.OverlapSphereNonAlloc(at, closeCallRadius, Near, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+				for (int k = 0; k < n && !CloseCall; k++) CloseCall = Near[k].attachedRigidbody == null;
+			}
+			if (CloseCall) AddBoost(closeCallRecharge * dt);
+
 			// Above the ceiling or off the course: short countdown, then the glider is destroyed.
 			AboveCeiling = at.y > ceiling;
-			if ((AboveCeiling || at.x < minX || at.x > maxX || at.z < minZ) && Ghost <= 0f)
+			if ((AboveCeiling || at.x < minX || at.x > maxX) && Ghost <= 0f)
 			{
 				OutOfBoundsTime += dt;
 				if (OutOfBoundsTime >= ceilingGrace) Crash(_rb.position);
@@ -150,6 +170,23 @@ namespace GliderJam.Flight
 				OutOfBoundsTime = 0f;
 			}
 		}
+
+		private static readonly Collider[] Near = new Collider[8];
+		private int _nearStep;
+
+		// Extra boost energy (close calls, slipstream, stunts).
+		public void AddBoost(float amount)
+		{
+			BoostEnergy = Mathf.Clamp01(BoostEnergy + amount);
+		}
+
+		// Free boost for a few seconds (stunt reward).
+		public void Burst(float seconds)
+		{
+			_burst = Mathf.Max(_burst, seconds);
+		}
+
+		private float _burst;
 
 		private static Terrain[] _terrains = new Terrain[0];
 		private static int _terrainFrame = -1000;
@@ -198,6 +235,7 @@ namespace GliderJam.Flight
 			Roll = 0f;
 			Speed = cruiseSpeed;
 			OutOfBoundsTime = 0f;
+			_burst = 0f;
 			_rb.linearVelocity = rotation * Vector3.forward * Speed;
 			foreach (Collider c in _colliders) c.enabled = true;
 			Crashed = false;

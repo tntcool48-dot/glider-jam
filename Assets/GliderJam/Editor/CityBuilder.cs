@@ -52,6 +52,7 @@ namespace GliderJam.EditorTools
 		private static List<Vector3> _route;
 		private static readonly List<LightSpec> Lights = new List<LightSpec>();
 		private static readonly List<Bounds> Bridges = new List<Bounds>();
+		private static readonly List<(Bounds box, TrickZone.Kind kind)> Tricks = new List<(Bounds, TrickZone.Kind)>();
 		private static readonly List<BoardSpec> Boards = new List<BoardSpec>();
 		private static readonly Dictionary<Vector2Int, List<Bounds>> Solids = new Dictionary<Vector2Int, List<Bounds>>();
 		private static int _signLights;
@@ -66,6 +67,7 @@ namespace GliderJam.EditorTools
 			_rng = new Random(20261031);
 			Lights.Clear();
 			Bridges.Clear();
+			Tricks.Clear();
 			Boards.Clear();
 			Solids.Clear();
 			Cylinders.Clear();
@@ -100,6 +102,7 @@ namespace GliderJam.EditorTools
 				if (go != null) flickerRenderers.Add(go.GetComponent<Renderer>());
 			}
 			MakeColliders(city);
+			MakeTricks(city);
 			MakeLights();
 			Renderer[] boardRenderers = MakeBillboards(city, boards);
 			Atmosphere();
@@ -117,8 +120,8 @@ namespace GliderJam.EditorTools
 			rr.checkpointRadius = 24f;
 			rr.finishRadius = 34f;
 			rr.ceiling = Ceiling;
-			rr.minX = CoreI0 * Pitch; // the skyline beyond the core blocks has no collision
-			rr.maxX = (CoreI1 + 1) * Pitch;
+			rr.minX = CoreI0 * Pitch - HalfStreet + 4f; // the outer avenues' far kerbs: the skyline beyond has no collision
+			rr.maxX = (CoreI1 + 1) * Pitch + HalfStreet - 4f;
 			var rm = new GameObject("Race Manager").AddComponent<RaceManager>();
 			rm.fx = AssetDatabase.LoadAssetAtPath<FxLibrary>(FxBuilder.LibraryPath);
 			rm.route = rr;
@@ -127,7 +130,7 @@ namespace GliderJam.EditorTools
 			AddToBuild();
 			AssetDatabase.SaveAssets();
 			return "city: " + verts + " core verts, " + farVerts + " skyline verts, " + Lights.Count + " lights, " + Boards.Count + " billboards, route "
-				+ rr.path.Length + " samples / " + checkpoints.Length + " checkpoints; " + Verify(rr)
+				+ rr.path.Length + " samples / " + checkpoints.Length + " checkpoints; " + _mazeStats + "; " + Verify(rr)
 				+ (AtmosphereSetup.Missing.Count > 0 ? "; missing: " + string.Join(", ", AtmosphereSetup.Missing) : "");
 		}
 
@@ -435,6 +438,10 @@ namespace GliderJam.EditorTools
 			var b = new Bounds();
 			b.SetMinMax(min, max);
 			Bridges.Add(b);
+			float under = Mathf.Max(1f, y0 - 30f); // flying under the bridge is a stunt
+			var u = new Bounds();
+			u.SetMinMax(new Vector3(x - HalfStreet, under, z - 9f), new Vector3(x + HalfStreet, y0 - 0.5f, z + 9f));
+			if (y0 > 12f) Tricks.Add((u, TrickZone.Kind.UnderBridge));
 			MB mb = At(core, b.center);
 			mb.Box(min, max, R() < 0.5f ? Slot.Mirror : Slot.MirrorGold, Slot.Roof, new Vector2(R(0f, 40f), 0f), true, Slot.Metal); // dark underside: chrome right above the neon tubes blew out
 			Solid(min, max);
@@ -464,43 +471,128 @@ namespace GliderJam.EditorTools
 			return false;
 		}
 
-		// Free-route racing would otherwise be "fly up any avenue": close about a third of the avenue segments and a
-		// quarter of the cross-street segments with buildings that span the street (taller than the ceiling). The race
-		// line stays open, the start rows and the waterfront too, and wherever an avenue is closed ahead at least one
-		// side street stays open (a dead end would need a U-turn, which the wrong-way rule turns back around).
+		private static string _mazeStats = "";
+
+		// Free-route racing would otherwise be "fly up any avenue", so buildings taller than the ceiling close street
+		// segments, but never into a dead end. Row j is the cross street at z = j * Pitch; its open stretches join
+		// neighbouring avenues into groups, and every group keeps at least one open avenue north (two for groups of five
+		// or more), with at least three per row: from every intersection there is a way on without turning back.
+		// Straights stay short: an avenue open for two blocks in a row is closed on the next unless a group needs it, so
+		// racers keep cutting across. Some closed avenues are gates: a building over the street with a lit tunnel
+		// through it, the risky way to keep going straight. The race line (autopilot, respawns), the start row and the
+		// waterfront stay open.
+		private const int MaxStraight = 2;
+
 		private static void MakeBlockers(Dictionary<Vector2Int, MB> core)
 		{
 			Blocked.Clear();
-			var avenue = new HashSet<(int, int)>();
-			var street = new HashSet<(int, int)>();
-			for (int i = CoreI0; i <= CoreI1 + 1; i++)
+			var rng = new Random(7406); // own sequence, so maze tweaks don't reshuffle the rest of the city
+			int avenues = CoreI1 + 2 - CoreI0; // avenue k is at x = (CoreI0 + k) * Pitch
+			int walls = 0, gates = 0, minNorth = avenues, longest = 0;
+			var run = new int[avenues]; // open avenue segments in a row so far (gates don't count as open)
+			Rect AvenueSeg(int k, int j)
 			{
-				for (int j = 0; j < CoreJ1; j++)
+				float x = (CoreI0 + k) * Pitch;
+				return Rect.MinMaxRect(x - HalfStreet - 2f, j * Pitch + HalfStreet + 8f, x + HalfStreet + 2f, (j + 1) * Pitch - HalfStreet - 8f);
+			}
+			for (int j = 0; j <= CoreJ1; j++)
+			{
+				// Cross street j: close some stretches between neighbouring avenues (not on the start row).
+				var streetOpen = new bool[avenues - 1];
+				for (int k = 0; k < avenues - 1; k++)
 				{
-					if (R() > 0.38f) continue;
-					float x = i * Pitch;
-					Rect r = Rect.MinMaxRect(x - HalfStreet - 2f, j * Pitch + HalfStreet + 8f, x + HalfStreet + 2f, (j + 1) * Pitch - HalfStreet - 8f);
-					if (RouteNear(r, 25f)) continue;
-					avenue.Add((i, j));
-					Blocker(core, r);
+					float x = (CoreI0 + k) * Pitch;
+					Rect r = Rect.MinMaxRect(x + HalfStreet + 8f, j * Pitch - HalfStreet - 2f, x + Pitch - HalfStreet - 8f, j * Pitch + HalfStreet + 2f);
+					streetOpen[k] = j == 0 || rng.NextDouble() > 0.3 || RouteNear(r, 25f);
+					if (!streetOpen[k])
+					{
+						Blocker(core, r);
+						walls++;
+					}
+				}
+				if (j == CoreJ1) break; // the last blocks open onto the waterfront
+
+				// Avenue segments north of row j: about half close at random, and so does any avenue already open for
+				// MaxStraight blocks. Then reopen some (shortest straights first) until every group has its way on.
+				var north = new bool[avenues];
+				var route = new bool[avenues];
+				for (int k = 0; k < avenues; k++)
+				{
+					route[k] = RouteNear(AvenueSeg(k, j), 25f);
+					north[k] = route[k] || (run[k] < MaxStraight && rng.NextDouble() > 0.5);
+				}
+				int Pick(int from, int size) // a closed avenue in [from, from + size), preferring the shortest straight
+				{
+					int best = -1;
+					for (int q = from; q < from + size; q++)
+					{
+						if (!north[q] && (best < 0 || run[q] < run[best] || (run[q] == run[best] && rng.NextDouble() < 0.5))) best = q;
+					}
+					return best;
+				}
+				for (int g0 = 0, k = 0; k < avenues; k++)
+				{
+					if (k < avenues - 1 && streetOpen[k]) continue; // the group carries on east
+					int size = k - g0 + 1, open = 0;
+					for (int q = g0; q <= k; q++) if (north[q]) open++;
+					for (int need = Mathf.Min(size >= 5 ? 2 : 1, size); open < need; open++) north[Pick(g0, size)] = true;
+					g0 = k + 1;
+				}
+				int count = 0;
+				foreach (bool o in north) if (o) count++;
+				for (; count < 3; count++) north[Pick(0, avenues)] = true;
+				minNorth = Mathf.Min(minNorth, count);
+				for (int k = 0; k < avenues; k++)
+				{
+					if (north[k])
+					{
+						run[k]++;
+						if (!route[k]) longest = Mathf.Max(longest, run[k]);
+						continue;
+					}
+					run[k] = 0;
+					if (rng.NextDouble() < 0.3) { Gate(core, AvenueSeg(k, j)); gates++; }
+					else { Blocker(core, AvenueSeg(k, j)); walls++; }
 				}
 			}
-			bool Open(int i, int j) => i >= CoreI0 && i <= CoreI1 && !street.Contains((i, j));
-			for (int j = 1; j <= CoreJ1; j++)
+			_mazeStats = "maze: " + walls + " walls, " + gates + " gates, " + minNorth + "+ open avenues north of every row, straights off the race line up to "
+				+ longest + " blocks, no dead ends";
+		}
+
+		// A building over the avenue with a 44 x 38 m tunnel through it at a random height: neon portal frames, light
+		// strips along the tunnel and a polished floor; collides like any other building.
+		private static void Gate(Dictionary<Vector2Int, MB> core, Rect r)
+		{
+			Blocked.Add(r);
+			float h = R(175f, 300f), cx = r.center.x, hw = 22f, y0 = R(30f, 85f), y1 = y0 + 38f;
+			Slot[] styles = { Slot.Housing, Slot.Dim, Slot.Office, Slot.Concrete };
+			Slot wall = styles[_rng.Next(styles.Length)];
+			var off = new Vector2(_rng.Next(0, 16) * ColW, _rng.Next(0, 32) * FloorH);
+			MB mb = At(core, new Vector3(cx, 0f, r.center.y));
+			void Part(Vector3 min, Vector3 max, Slot top, bool bottom)
 			{
-				for (int i = CoreI0; i <= CoreI1; i++)
-				{
-					if (R() > 0.3f) continue;
-					// This segment is the east exit of intersection (i, j) and the west exit of (i + 1, j).
-					if (avenue.Contains((i, j)) && !Open(i - 1, j)) continue;
-					if (avenue.Contains((i + 1, j)) && !Open(i + 1, j)) continue;
-					float z = j * Pitch;
-					Rect r = Rect.MinMaxRect(i * Pitch + HalfStreet + 8f, z - HalfStreet - 2f, (i + 1) * Pitch - HalfStreet - 8f, z + HalfStreet + 2f);
-					if (RouteNear(r, 25f)) continue;
-					street.Add((i, j));
-					Blocker(core, r);
-				}
+				mb.Box(min, max, wall, top, off, bottom, Slot.Metal);
+				Solid(min, max);
 			}
+			Part(new Vector3(r.xMin, 0f, r.yMin), new Vector3(r.xMax, y0, r.yMax), Slot.Marble, false); // under the tunnel
+			Part(new Vector3(r.xMin, y1, r.yMin), new Vector3(r.xMax, h, r.yMax), Slot.Roof, true);     // over it
+			Part(new Vector3(r.xMin, y0, r.yMin), new Vector3(cx - hw, y1, r.yMax), Slot.Roof, false);  // side walls
+			Part(new Vector3(cx + hw, y0, r.yMin), new Vector3(r.xMax, y1, r.yMax), Slot.Roof, false);
+			var tunnel = new Bounds();
+			tunnel.SetMinMax(new Vector3(cx - hw + 1f, y0 + 1f, r.yMin), new Vector3(cx + hw - 1f, y1 - 1f, r.yMax));
+			Tricks.Add((tunnel, TrickZone.Kind.Gate));
+			int n = _rng.Next(NeonSlots.Length);
+			foreach (float z in new[] { r.yMin - 0.4f, r.yMax + 0.4f })
+			{
+				Tube(mb, new Vector3(cx - hw, y0, z), new Vector3(cx + hw, y0, z), 0.7f, NeonSlots[n]);
+				Tube(mb, new Vector3(cx - hw, y1, z), new Vector3(cx + hw, y1, z), 0.7f, NeonSlots[n]);
+				Tube(mb, new Vector3(cx - hw, y0, z), new Vector3(cx - hw, y1, z), 0.7f, NeonSlots[n]);
+				Tube(mb, new Vector3(cx + hw, y0, z), new Vector3(cx + hw, y1, z), 0.7f, NeonSlots[n]);
+			}
+			Tube(mb, new Vector3(cx - hw + 0.4f, y1 - 0.4f, r.yMin), new Vector3(cx - hw + 0.4f, y1 - 0.4f, r.yMax), 0.4f, NeonSlots[n]);
+			Tube(mb, new Vector3(cx + hw - 0.4f, y1 - 0.4f, r.yMin), new Vector3(cx + hw - 0.4f, y1 - 0.4f, r.yMax), 0.4f, NeonSlots[n]);
+			AddLight(new Vector3(cx, y1 - 5f, r.center.y), NeonColors[n], 14000f, 70f, 0.6f);
+			Ring(mb, new Vector3(r.xMin, 0f, r.yMin), new Vector3(r.xMax, h, r.yMax), R(y1 + 12f, Ceiling - 5f), 0.3f, 0.5f, NeonSlots[_rng.Next(NeonSlots.Length)]);
 		}
 
 		private static void Blocker(Dictionary<Vector2Int, MB> core, Rect r)
@@ -1145,6 +1237,23 @@ namespace GliderJam.EditorTools
 			return spans;
 		}
 
+		// Trigger boxes for the stunts (gate tunnels, under skybridges); RaceManager pays out the boost.
+		private static void MakeTricks(Transform parent)
+		{
+			var root = new GameObject("City Stunts").transform;
+			root.SetParent(parent, false);
+			foreach (var (box, kind) in Tricks)
+			{
+				var go = new GameObject(kind == TrickZone.Kind.Gate ? "Gate Tunnel" : "Under Bridge");
+				go.transform.SetParent(root, false);
+				go.transform.position = box.center;
+				var c = go.AddComponent<BoxCollider>();
+				c.isTrigger = true;
+				c.size = box.size;
+				go.AddComponent<TrickZone>().kind = kind;
+			}
+		}
+
 		private static void MakeColliders(Transform parent)
 		{
 			var root = new GameObject("Colliders").transform;
@@ -1265,7 +1374,7 @@ namespace GliderJam.EditorTools
 			AtmosphereSetup.P(fog, "globalLightProbeDimmer", 1f);
 			var exposure = AtmosphereSetup.Get<Exposure>(profile);
 			AtmosphereSetup.P(exposure, "mode", ExposureMode.Fixed);
-			AtmosphereSetup.P(exposure, "fixedExposure", 3.0f);
+			AtmosphereSetup.P(exposure, "fixedExposure", 1.4f); // was 3.0: too dark without ray traced GI
 			var tone = AtmosphereSetup.Get<Tonemapping>(profile);
 			AtmosphereSetup.P(tone, "mode", TonemappingMode.ACES);
 			var bloom = AtmosphereSetup.Get<Bloom>(profile);
@@ -1332,7 +1441,7 @@ namespace GliderJam.EditorTools
 				Vector3 side = Vector3.Cross(Vector3.up, f);
 				foreach (float o in new[] { -10f, 0f, 10f })
 				{
-					if (!Physics.CheckSphere(p + side * o, 8f)) continue;
+					if (!Physics.CheckSphere(p + side * o, 8f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) continue;
 					bad++;
 					if (first.Count < 6) first.Add(i + "@" + (p + side * o).ToString("F0"));
 				}

@@ -42,7 +42,8 @@ namespace GliderJam.UI
 			_time += Time.unscaledDeltaTime;
 			if (_time < 0.25f) return;
 			float fps = _frames / _time;
-			_text.text = Mathf.RoundToInt(fps) + " FPS  <size=75%>" + (1000f / fps).ToString("0.0") + " ms</size>";
+			float scale = AutoResolution.Scale(GameConfig.Current);
+			_text.text = Mathf.RoundToInt(fps) + " FPS  <size=75%>" + (1000f / fps).ToString("0.0") + " ms" + (scale < 99.5f ? "  " + Mathf.RoundToInt(scale) + "% RES" : "") + "</size>";
 			_text.color = fps >= 60f ? new Color(0.45f, 1f, 0.5f) : fps >= 30f ? new Color(1f, 0.85f, 0.3f) : new Color(1f, 0.35f, 0.3f);
 			_frames = 0;
 			_time = 0f;

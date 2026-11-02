@@ -51,7 +51,8 @@ namespace GliderJam
 		public int displayMode;            // 0 borderless, 1 exclusive fullscreen, 2 windowed
 		public bool vsync = true;
 		public int frameCap;               // 0 = unlimited
-		public int renderScale = 100;      // 50..100 %
+		public int renderScale = 100;      // 50..100 % (the ceiling when auto resolution is on)
+		public bool autoResolution = true; // lower the render scale while the GPU can't hold 60 fps
 		public int upscaler = 1;           // 0 Catmull-Rom, 1 TAA upscale, 2 FSR 1 (edge adaptive)
 
 		// ---- graphics
@@ -80,6 +81,7 @@ namespace GliderJam
 
 		// ---- controls
 		public PlayerControls[] players = DefaultPlayers();
+		public int perfVersion = 1; // 1: auto resolution exists (turned on for settings saved before it)
 		public int controlsVersion; // 2: player 2 boosts with Right Shift (next to the arrows), brakes with Right Ctrl
 
 		// ---- records
@@ -120,6 +122,17 @@ namespace GliderJam
 		}
 
 		public bool UsesRayTracing => ambientOcclusion == 2 || reflections == 2 || globalIllumination == 2;
+
+		// First launch (no settings file yet): a preset to suit the graphics card. Integrated graphics or under 3 GB of
+		// video memory get Low, under 7 GB Medium, the rest High; auto resolution then holds 60 fps on top.
+		public static QualityPreset DetectPreset()
+		{
+			string n = (SystemInfo.graphicsDeviceName ?? "").ToLowerInvariant();
+			int vram = SystemInfo.graphicsMemorySize;
+			bool integrated = (n.Contains("intel") && !n.Contains("arc")) || (n.Contains("radeon") && n.Contains("graphics") && !n.Contains(" rx")) || n.Contains(" mx");
+			if (integrated || vram < 3000) return QualityPreset.Low;
+			return vram < 7000 ? QualityPreset.Medium : QualityPreset.High;
+		}
 
 		public static PlayerControls[] DefaultPlayers()
 		{
@@ -177,7 +190,7 @@ namespace GliderJam
 				Debug.LogWarning("GliderJam: could not read settings, using defaults (" + e.Message + ")");
 			}
 			var d = new GameConfig();
-			d.ApplyPreset(QualityPreset.High);
+			d.ApplyPreset(DetectPreset());
 			return d;
 		}
 
@@ -190,6 +203,11 @@ namespace GliderJam
 				p.fieldOfView = Mathf.Clamp(p.fieldOfView <= 1f ? 62f : p.fieldOfView, 50f, 100f);
 			}
 			renderScale = Mathf.Clamp(renderScale == 0 ? 100 : renderScale, 50, 100);
+			if (perfVersion < 1)
+			{
+				autoResolution = true;
+				perfVersion = 1;
+			}
 			if (controlsVersion < 2)
 			{
 				// Saved before the swap and still on the old defaults: move them to the new layout.
@@ -227,7 +245,7 @@ namespace GliderJam
 		{
 			var keepBest = _current;
 			_current = new GameConfig();
-			_current.ApplyPreset(QualityPreset.High);
+			_current.ApplyPreset(DetectPreset());
 			if (keepBest != null)
 			{
 				_current.bestSoloCanyon = keepBest.bestSoloCanyon;

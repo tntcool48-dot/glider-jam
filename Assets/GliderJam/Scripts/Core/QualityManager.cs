@@ -32,6 +32,7 @@ namespace GliderJam
 			Instance = go.AddComponent<QualityManager>();
 			go.AddComponent<Audio.MusicPlayer>();
 			go.AddComponent<UI.FpsCounter>();
+			go.AddComponent<AutoResolution>();
 			Benchmark.ApplyCommandLineOverrides(GameConfig.Current);
 		}
 
@@ -71,7 +72,7 @@ namespace GliderJam
 			ApplyVolume(cfg);
 			QualitySettings.globalTextureMipmapLimit = 2 - Mathf.Clamp(cfg.textureQuality, 0, 2);
 			QualitySettings.lodBias = new[] { 0.7f, 1f, 1.6f, 2.6f }[Mathf.Clamp(cfg.terrainDetail, 0, 3)];
-			DynamicResolutionHandler.SetDynamicResScaler(() => GameConfig.Current.renderScale, DynamicResScalePolicyType.ReturnsPercentage);
+			DynamicResolutionHandler.SetDynamicResScaler(() => AutoResolution.Scale(GameConfig.Current), DynamicResScalePolicyType.ReturnsPercentage);
 			AudioListener.volume = cfg.masterVolume;
 			_configured.Clear();
 			foreach (Camera c in Camera.allCameras)
@@ -216,7 +217,7 @@ namespace GliderJam
 				: cfg.antiAliasing == 2 ? HDAdditionalCameraData.AntialiasingMode.SubpixelMorphologicalAntiAliasing
 				: HDAdditionalCameraData.AntialiasingMode.TemporalAntialiasing;
 			hd.TAAQuality = cfg.preset >= QualityPreset.Ultra ? HDAdditionalCameraData.TAAQualityLevel.High : HDAdditionalCameraData.TAAQualityLevel.Medium;
-			bool dynamic = cfg.renderScale < 100;
+			bool dynamic = cfg.renderScale < 100 || cfg.autoResolution;
 			cam.allowDynamicResolution = dynamic;
 			hd.allowDynamicResolution = dynamic;
 			DynamicResolutionHandler.SetUpscaleFilter(cam, cfg.upscaler == 0 ? DynamicResUpscaleFilter.CatmullRom : cfg.upscaler == 2 ? DynamicResUpscaleFilter.EdgeAdaptiveScalingUpres : DynamicResUpscaleFilter.TAAU);

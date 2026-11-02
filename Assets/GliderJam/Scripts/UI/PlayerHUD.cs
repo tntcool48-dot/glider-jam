@@ -61,6 +61,17 @@ namespace GliderJam.UI
 			_boostFill.fillMethod = Image.FillMethod.Horizontal;
 			_boostFill.sprite = _pill;
 			Accent(bl, _color);
+			_bonus = Text(bl, "", 22 * s, new Vector2(18f * s, 34f * s), TextAlignmentOptions.TopLeft, new Color(1f, 0.92f, 0.55f), FontStyles.Bold | FontStyles.Italic);
+			_bonus.outlineWidth = 0.2f;
+			_bonus.outlineColor = new Color32(0, 0, 0, 180);
+
+			// Stunt callouts, upper middle
+			_callout = Text(_root, "", 54 * s, Vector2.zero, TextAlignmentOptions.Center, new Color(1f, 0.85f, 0.35f), FontStyles.Bold | FontStyles.Italic);
+			Center(_callout.rectTransform, new Vector2(0f, 205f * s), new Vector2(1200f, 70f));
+			_callout.outlineWidth = 0.2f;
+			_callout.outlineColor = new Color32(0, 0, 0, 200);
+			_calloutSub = Text(_root, "", 24 * s, Vector2.zero, TextAlignmentOptions.Center, Color.white, FontStyles.Bold);
+			Center(_calloutSub.rectTransform, new Vector2(0f, 160f * s), new Vector2(1200f, 36f));
 
 			// Player tag (split-screen only)
 			if (playerCount > 1)
@@ -132,7 +143,8 @@ namespace GliderJam.UI
 		private Image _oobVignette;
 		private TextMeshProUGUI _oobTitle, _oobSub, _oobCount;
 
-		// Countdown warning (ceiling, off course, wrong way): red vignette, title, hint and seconds left.
+		// Countdown warning (ceiling, off course): red vignette, title, hint and seconds left. With secondsLeft < 0 it is a
+		// plain notice (wrong way): a softer amber vignette and no countdown.
 		public void SetWarning(bool on, string title, string sub, float secondsLeft, float grace)
 		{
 			if (_oob == null) return;
@@ -140,11 +152,43 @@ namespace GliderJam.UI
 			if (!on) return;
 			_oobTitle.text = title;
 			_oobSub.text = sub;
+			if (secondsLeft < 0f)
+			{
+				float glow = 0.5f + 0.5f * Mathf.Sin(Time.time * 5f);
+				_oobVignette.color = new Color(1f, 0.55f, 0.1f, 0.3f + 0.15f * glow);
+				_oobCount.text = "";
+				return;
+			}
 			float urgency = 1f - Mathf.Clamp01(secondsLeft / Mathf.Max(0.01f, grace));
 			float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * (10f + urgency * 14f));
 			_oobVignette.color = new Color(1f, 0.08f, 0.05f, Mathf.Lerp(0.45f, 0.9f, urgency) * (0.75f + 0.25f * pulse));
 			_oobCount.text = secondsLeft.ToString("0.0");
 			_oobCount.color = Color.Lerp(Color.white, new Color(1f, 0.3f, 0.25f), urgency);
+		}
+
+		private TextMeshProUGUI _bonus, _callout, _calloutSub;
+		private float _bonusUntil, _calloutAt = -10f, _shownBonus = -1f, _shownCallout = -1f;
+		private string _bonusLabel;
+
+		// A stunt pulled off (gate threaded, under a bridge): a short, punchy callout.
+		public void Callout(string text, string sub)
+		{
+			if (_callout == null) return;
+			_callout.text = text;
+			_calloutSub.text = sub;
+			_calloutAt = Time.time;
+		}
+
+		// "CLOSE CALL" / "SLIPSTREAM": boost refilling faster. Shown over the boost bar (which glows) while it lasts.
+		public void SetBonus(string label)
+		{
+			if (_bonus == null) return;
+			if (label != _bonusLabel)
+			{
+				_bonusLabel = label;
+				_bonus.text = label + "  <size=80%>+BOOST</size>";
+			}
+			_bonusUntil = Time.time + 0.35f;
 		}
 
 		public void ShowMessage(string text, string sub, Color color, float seconds)
@@ -162,6 +206,22 @@ namespace GliderJam.UI
 			float a = Mathf.Clamp01(left * 3f);
 			_message.alpha = a;
 			_sub.alpha = a;
+			// Bonus label and callout: only touch the UI while they are showing or fading (each change re-meshes the canvas).
+			float b = Mathf.Clamp01((_bonusUntil - Time.time) * 4f);
+			if (b > 0f || _shownBonus != 0f)
+			{
+				_shownBonus = b;
+				_bonus.alpha = b;
+				_boostFill.color = Color.Lerp(_color, Color.white, b * (0.35f + 0.25f * Mathf.Sin(Time.time * 18f)));
+			}
+			float age = Time.time - _calloutAt, c = age < 1.2f ? 1f : Mathf.Clamp01(1f - (age - 1.2f) * 3f);
+			if (c > 0f || _shownCallout != 0f)
+			{
+				_shownCallout = c;
+				_callout.alpha = c;
+				_calloutSub.alpha = c;
+				_callout.rectTransform.localScale = Vector3.one * (1f + 0.35f * Mathf.Clamp01(1f - age * 5f));
+			}
 		}
 
 		// Marker over the other glider, or an edge arrow when it's off this player's screen.

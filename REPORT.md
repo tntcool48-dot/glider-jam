@@ -4,6 +4,43 @@ Everything lives on F: (project `F:\glider_jam\GliderJam`, player build `F:\glid
 benchmark logs `F:\glider_jam\Build\Benchmarks`). Unity 6000.3.18f1, HDRP 17.3, D3D12, tested on an
 RX 7900 XT / Ryzen 7 9700X.
 
+## Meetup polish (latest)
+
+- City routes: no dead ends, but no long straights either.
+  - Each cross street splits the avenues into groups that are connected along it, and every group keeps at least
+    one open avenue ahead (two for groups of five or more), with at least 3 per row. From any intersection there
+    is a way forward without turning back.
+  - An avenue that has been open for two blocks closes on the next unless a group needs it, so you keep cutting
+    across. Off the race line no straight is longer than 3 blocks.
+  - 147 blocking buildings plus 37 gates: a building over the street with a 44 x 38 m tunnel through it, neon
+    portal frames and a lit interior. Gates are the risky way to keep going straight. Tested: straight through a
+    tunnel is clean, the wall next to it is a crash.
+- Stunts pay out boost (boost is speed):
+  - Threading a gate tunnel all the way through: +50% boost and a 2 s free speed burst ("THREADED IT!").
+  - Flying under a skybridge: +25% boost and a short burst ("UNDER THE BRIDGE").
+  - Knife edge: a close call with the wings past 65 degrees refills boost faster still.
+  - Tested in a live race: both callouts fire and the burst takes the glider to boost speed with no input.
+- City side limits moved out to the far kerb of the two outer avenues. Before, flying in the outer half of those
+  streets set off "OFF COURSE".
+- Wrong way only warns: an amber "WRONG WAY / THE FINISH IS BEHIND YOU" with a soft beep, no countdown, no forced
+  turn, no crash. The only limit is 250 m behind the start line, where the course ends: the glider is turned around
+  there (it never breaks up for flying backwards).
+- Boost you earn:
+  - Close calls: within 14 m of a wall, building or the ground, boost refills about 6x faster.
+  - Slipstream (split-screen): within 80 m behind the other glider, nearly dead ahead, refills it too.
+  - "CLOSE CALL / SLIPSTREAM +BOOST" shows over the boost bar, which glows. The countdown hint tells players how to
+    earn boost.
+- City brightness: fixed exposure EV 3.0 -> 1.4. Building surfaces, lit windows and the city-glow sky now show
+  without ray tracing; the neon still reads as neon, and ray tracing on top isn't blown out.
+- Weaker PCs:
+  - Auto resolution (Settings > Display, on by default): measures GPU frame time and lowers the internal
+    resolution (down to 50%, upscaled with TAA upscale) when the GPU can't hold 60 fps, raising it again when it
+    can. Render Scale is the ceiling; a fast PC stays at 100%. The FPS counter shows the current resolution when
+    it is below 100%.
+  - First launch picks a preset from the graphics card: integrated graphics or under 3 GB of video memory get Low,
+    under 7 GB Medium, the rest High. This only happens without a settings file. To test that on another PC, copy
+    the build without `Build\Settings\` (it holds your own settings).
+
 ## What changed, by request
 
 | You asked for | Status | Where |
@@ -32,10 +69,10 @@ RX 7900 XT / Ryzen 7 9700X.
 - Each race goes one way (+Z): start at one end, finish by crossing a line of gold light that spans the whole
   course. No checkpoint rings and no minimap; take any line you like.
 - HUD: distance to go, a finish marker straight ahead (with an arrow when it's off screen), the other player.
-- Wrong way: heading back towards the start for 0.6 s shows "WRONG WAY / TURN AROUND" with a 3 s countdown,
-  then the glider is turned around. Sideways is fine.
-- Off course: the sides of each course (canyon corridor, city core; the scenery beyond has no collision) and the
-  area behind the start count like the ceiling: "OFF COURSE", 2 s, then the glider breaks up.
+- Wrong way: heading back towards the start for 0.6 s shows an amber "WRONG WAY" notice, nothing more. Only
+  250 m behind the start line, where the course ends, is the glider turned around.
+- Off course: the sides of each course (canyon corridor, city core; the scenery beyond has no collision) count
+  like the ceiling: "OFF COURSE", 2 s, then the glider breaks up.
 - Crash: respawn on the known-clear race line a little behind the crash. After you finish, a crash just plays out.
 - The old race line is kept for the autopilot (benchmarks, menu flyover) and respawns.
 
@@ -57,10 +94,9 @@ RX 7900 XT / Ryzen 7 9700X.
   the towers, all as light streaks from one particle system.
 - Wet asphalt with puddles, lane markings, lamps, skybridges, the finish over the harbor, far-shore skyline and
   bay bridge (Distant landscape setting), night sky with city glow, volumetric fog, rain per player view.
-- Harder: ceiling 150 m and every tower at least 165 m, so you can't fly over the blocks; about a third of the
-  avenue segments and a quarter of the cross streets are closed by buildings that span the street, plus
-  skybridges at mixed heights. Wherever an avenue closes ahead, a side street stays open (a dead end would need a
-  U-turn, which the wrong-way rule would undo). The race line stays open and is checked for clearance.
+- Harder: ceiling 150 m and every tower at least 165 m, so you can't fly over the blocks. Buildings spanning the
+  street close 147 street segments and 37 more are fly-through gates, plus skybridges at mixed heights. There are
+  no dead ends and no long straights (see "Meetup polish"). The race line stays open and is checked for clearance.
 - Regenerate with `Tools/cli/eval/build_city.cs` (about 45 s).
 
 ## Canyon
@@ -104,6 +140,28 @@ shallow dive into a slope, vertical dive: all stop at the surface. Crash debris 
 - Ultra without ray tracing is still the recommended top setting for split-screen.
 
 ## Benchmarks (1920x1080 fullscreen, autopilot race, vsync off)
+
+Meetup build (tighter city maze with gates and stunt zones, brighter city, close calls and slipstream). Logs
+`Build\Benchmarks\v6_*`, `v7_*`:
+
+| run | avg fps | 1% low | GPU ms | CPU ms | frames < 60 fps |
+|---|---|---|---|---|---|
+| city split Low | 376.5 | 52.6 | 2.06 | 2.31 | 0.8% |
+| city split Medium | 217.1 | 87.7 | 3.80 | 4.34 | 0.1% |
+| city split High | 145.0 | 35.7 | 6.17 | 4.77 | 1.8% |
+| city split Ultra RT, fixed resolution | 62.4 | 33.9 | 15.04 | 8.85 | 28.2% |
+| city split Ultra RT, auto resolution (average 83%) | 69.6 | 31.4 | 13.24 | 9.01 | 14.0% |
+| canyon split Low | 289.6 | 40.4 | 2.57 | 2.89 | 0.9% |
+| canyon split Medium | 167.4 | 47.5 | 4.65 | 5.78 | 0.4% |
+| canyon split High | 131.6 | 52.3 | 6.44 | 7.19 | 0.3% |
+
+- Auto resolution does its job on the heaviest case: city split-screen with ray tracing went from 62 to 70 fps
+  and the frames under 60 halved. It can't help where the CPU is the limit (canyon solo with ray tracing: 13 ms
+  of CPU, so it stayed at about 100%).
+- The close-call check first cost the canyon about 0.7 ms of CPU; checking every other physics step and touching
+  the HUD only when it changes brought it back to within 2%.
+- Benchmarks run at a fixed resolution unless `-set autoResolution=1` is passed, and the summary reports the
+  average and lowest scale when it is on.
 
 Full matrix, before the ray tracing change and the harder maps (`Build\Benchmarks\summary.md`):
 

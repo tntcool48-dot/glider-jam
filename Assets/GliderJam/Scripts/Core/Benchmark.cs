@@ -23,6 +23,7 @@ namespace GliderJam
 		private readonly List<float> _frames = new List<float>(20000);
 		private readonly List<float> _gpu = new List<float>(20000);
 		private readonly List<float> _cpu = new List<float>(20000);
+		private readonly List<float> _scale = new List<float>(20000);
 		private readonly List<string> _notes = new List<string>();
 		private float _raceStartedAt = -1f;
 		private readonly FrameTiming[] _timing = new FrameTiming[1];
@@ -32,6 +33,7 @@ namespace GliderJam
 		public static void ApplyCommandLineOverrides(GameConfig cfg)
 		{
 			string[] args = Environment.GetCommandLineArgs();
+			if (Active) cfg.autoResolution = false; // measure at a fixed resolution unless -set autoResolution=1
 			for (int i = 0; i < args.Length - 1; i++)
 			{
 				if (args[i] == "-preset" && Enum.TryParse(args[i + 1], true, out QualityPreset p))
@@ -90,6 +92,7 @@ namespace GliderJam
 			if (t > _warmup && scene == _raceScene)
 			{
 				_frames.Add(Time.unscaledDeltaTime);
+				_scale.Add(AutoResolution.Scale(GameConfig.Current));
 				if (FrameTimingManager.GetLatestTimings(1, _timing) > 0)
 				{
 					_gpu.Add((float)_timing[0].gpuFrameTime);
@@ -121,7 +124,7 @@ namespace GliderJam
 			int n = sorted.Count;
 			var sb = new StringBuilder();
 			sb.AppendLine("Glider Jam benchmark  map=" + _raceScene + "  mode=" + GameSettings.Mode + "  preset=" + cfg.preset + (cfg.UsesRayTracing ? " (ray tracing)" : ""));
-			sb.AppendLine("resolution: " + Screen.width + "x" + Screen.height + " " + Screen.fullScreenMode + "  render scale " + cfg.renderScale + "%  quality level " + QualitySettings.names[QualitySettings.GetQualityLevel()]);
+			sb.AppendLine("resolution: " + Screen.width + "x" + Screen.height + " " + Screen.fullScreenMode + "  render scale " + cfg.renderScale + "%" + (cfg.autoResolution ? " (auto: average " + Avg(_scale).ToString("F0") + "%, lowest " + (_scale.Count > 0 ? Mathf.Min(_scale.ToArray()) : 0f).ToString("F0") + "%)" : "") + "  quality level " + QualitySettings.names[QualitySettings.GetQualityLevel()]);
 			sb.AppendLine("gpu: " + SystemInfo.graphicsDeviceName + " (" + SystemInfo.graphicsDeviceType + ")  cpu: " + SystemInfo.processorType);
 			sb.AppendLine("frames: " + n);
 			if (n > 0)

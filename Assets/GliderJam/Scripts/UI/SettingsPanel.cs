@@ -214,6 +214,7 @@ namespace GliderJam.UI
 			Choice("VSYNC", OffOn, () => Cfg.vsync ? 1 : 0, i => { Cfg.vsync = i == 1; Cfg.Commit(); });
 			int[] caps = { 0, 30, 60, 90, 120, 144, 165, 240 };
 			Choice("FRAME LIMIT", caps.Select(c => c == 0 ? "UNLIMITED" : c + " FPS").ToArray(), () => Mathf.Max(0, Array.IndexOf(caps, Cfg.frameCap)), i => { Cfg.frameCap = caps[i]; Cfg.Commit(); });
+			Choice("AUTO RESOLUTION (60 FPS)", OffOn, () => Cfg.autoResolution ? 1 : 0, i => { Cfg.autoResolution = i == 1; Cfg.Commit(); });
 			Slider("RENDER SCALE", 50f, 100f, () => Cfg.renderScale, v => { Cfg.renderScale = Mathf.RoundToInt(v); Cfg.preset = QualityPreset.Custom; Cfg.Commit(); }, v => Mathf.RoundToInt(v) + "%", true);
 			Choice("UPSCALER", new[] { "CATMULL-ROM", "TAA UPSCALE", "AMD FSR 1" }, () => Cfg.upscaler, i => { Cfg.upscaler = i; Cfg.Commit(); });
 			Choice("FPS COUNTER", OffOn, () => Cfg.showFps ? 1 : 0, i => { Cfg.showFps = i == 1; Cfg.Commit(); });

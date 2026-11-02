@@ -58,6 +58,7 @@ namespace GliderJam.Race
 
 		private void Start()
 		{
+			TrickZone.Passed += OnTrick;
 			DisableLegacyObjects();
 			if (GameSettings.Showcase)
 			{
@@ -90,7 +91,6 @@ namespace GliderJam.Race
 				p.glider.ceiling = route.ceiling;
 				p.glider.minX = route.minX;
 				p.glider.maxX = route.maxX;
-				p.glider.minZ = route.MinZ;
 				p.glider.OnCrash += HandleCrash;
 				p.visuals = go.AddComponent<GliderVisuals>();
 				p.visuals.trailMaterial = fx.trail;
@@ -236,12 +236,30 @@ namespace GliderJam.Race
 					p.hud.UpdateOther(op, label, !o.glider.Crashed);
 				}
 
-				// Wrong way: heading back towards the start. Warn, then turn the glider around.
+				// Slipstream: tucked in behind the other glider (under 80 m, nearly dead ahead) refills boost, which keeps
+				// races close; close calls with walls do the same (GliderController).
+				bool draft = false;
+				if (_players.Count == 2 && Running && !p.finished && !p.glider.Crashed)
+				{
+					Player leader = _players[1 - i];
+					Vector3 d = leader.glider.transform.position - pos;
+					draft = !leader.glider.Crashed && d.magnitude > 4f && d.magnitude < 80f && Vector3.Dot(d.normalized, p.glider.transform.forward) > 0.94f;
+					if (draft) p.glider.AddBoost(SlipstreamRecharge * Time.deltaTime);
+				}
+				// Knife edge: a close call with the wings near vertical pays extra.
+				bool knife = Running && !p.finished && p.glider.CloseCall && Mathf.Abs(p.glider.Roll) > 65f;
+				if (knife) p.glider.AddBoost(KnifeEdgeRecharge * Time.deltaTime);
+				if (knife) p.hud.SetBonus("KNIFE EDGE");
+				else if (draft) p.hud.SetBonus("SLIPSTREAM");
+				else if (Running && !p.finished && p.glider.CloseCall) p.hud.SetBonus("CLOSE CALL");
+
+				// Wrong way: heading back towards the start only warns (flying back is allowed, e.g. out of a blind alley).
+				// Far behind the start line, where the course ends, the glider is turned around.
 				Vector3 v = Vector3.ProjectOnPlane(p.glider.Velocity, Vector3.up);
 				bool backwards = Running && !p.finished && !p.glider.Crashed && v.sqrMagnitude > 100f && v.normalized.z < -0.25f;
-				p.wrongWay = backwards ? p.wrongWay + Time.deltaTime : Mathf.Max(0f, p.wrongWay - 2f * Time.deltaTime);
+				p.wrongWay = backwards ? Mathf.Min(p.wrongWay + Time.deltaTime, WrongWayWarn + 0.5f) : Mathf.Max(0f, p.wrongWay - 2f * Time.deltaTime);
 				bool wrong = p.wrongWay > WrongWayWarn;
-				if (p.wrongWay > WrongWayWarn + WrongWayGrace) TurnAround(p);
+				if (Running && !p.glider.Crashed && pos.z < route.MinZ) TurnAround(p);
 
 				// Above the ceiling / off the course: warning + alarm, countdown to destruction.
 				bool oob = p.glider.OutOfBounds && !p.glider.Crashed;
@@ -252,13 +270,18 @@ namespace GliderJam.Race
 				}
 				else
 				{
-					p.hud.SetWarning(wrong, "WRONG WAY", "TURN AROUND", WrongWayWarn + WrongWayGrace - p.wrongWay, WrongWayGrace);
+					p.hud.SetWarning(wrong, "WRONG WAY", "THE FINISH IS BEHIND YOU", -1f, 1f);
 				}
-				if ((oob || wrong) && Time.time >= p.nextAlarm)
+				if (oob && Time.time >= p.nextAlarm)
 				{
 					p.nextAlarm = Time.time + 0.3f;
 					AudioSynth.Play(AudioSynth.Beep, 0.45f, 1.7f);
 					Rumble(i, p, 0.15f, 0.45f, 0.12f);
+				}
+				else if (wrong && Time.time >= p.nextAlarm)
+				{
+					p.nextAlarm = Time.time + 1.2f; // a calm reminder, not an alarm
+					AudioSynth.Play(AudioSynth.Beep, 0.25f, 1.1f);
 				}
 
 				// Boost: lens effects swell and the pad hums.
@@ -286,7 +309,22 @@ namespace GliderJam.Race
 
 		private void OnDestroy()
 		{
+			TrickZone.Passed -= OnTrick;
 			UnityEngine.InputSystem.InputSystem.ResetHaptics();
+		}
+
+		// Stunts pay out boost: threading a gate tunnel refills a lot and fires a free speed burst, flying under a
+		// skybridge a little less.
+		private void OnTrick(GliderController g, TrickZone z)
+		{
+			Player p = _players.Find(x => x.glider == g);
+			if (p == null || !Running || p.finished) return;
+			bool gate = z.kind == TrickZone.Kind.Gate;
+			g.AddBoost(gate ? 0.5f : 0.25f);
+			g.Burst(gate ? 2f : 0.8f);
+			p.hud.Callout(gate ? "THREADED IT!" : "UNDER THE BRIDGE", gate ? "+BOOST   +SPEED BURST" : "+BOOST");
+			AudioSynth.Play(AudioSynth.Chime, 0.6f, gate ? 1.25f : 1f);
+			Rumble(_players.IndexOf(p), p, 0.3f, 0.6f, 0.2f);
 		}
 
 		private int Rank(int i)
@@ -299,14 +337,15 @@ namespace GliderJam.Race
 			return r;
 		}
 
-		// Shown under the countdown: this player's boost / brake keys (and the pad triggers if a pad is connected).
+		// Shown under the countdown: this player's boost / brake keys (and the pad triggers if a pad is connected), and
+		// how to earn boost.
 		private string ControlsHint(int i)
 		{
 			UnityEngine.InputSystem.Key[] k = GameConfig.Current.players[Mathf.Clamp(i, 0, 1)].keys;
 			string s = "BOOST  " + KeyName(k[(int)ControlAction.Boost]) + "      BRAKE  " + KeyName(k[(int)ControlAction.Brake]);
 			int pads = UnityEngine.InputSystem.Gamepad.all.Count;
 			if (_players.Count == 1 ? pads > 0 : pads > i) s += "      PAD  RT / LT";
-			return s;
+			return s + "\n<size=75%><alpha=#B0>SKIM WALLS" + (_players.Count > 1 ? " OR RIDE THE OTHER GLIDER'S SLIPSTREAM" : "") + " TO REFILL BOOST</size>";
 		}
 
 		private static string KeyName(UnityEngine.InputSystem.Key key)
@@ -321,8 +360,10 @@ namespace GliderJam.Race
 			return meters >= 1000f ? (meters / 1000f).ToString("0.0") + " km" : Mathf.RoundToInt(meters / 10f) * 10 + " m";
 		}
 
-		// Seconds of heading backwards before the warning shows, then before the glider is turned around.
-		private const float WrongWayWarn = 0.6f, WrongWayGrace = 3f;
+		// Seconds of heading backwards before the wrong-way warning shows.
+		private const float WrongWayWarn = 0.6f;
+		private const float SlipstreamRecharge = 0.4f; // boost energy per second in the other glider's wake
+		private const float KnifeEdgeRecharge = 0.5f;  // on top of the close-call refill
 
 		private void TurnAround(Player p)
 		{
