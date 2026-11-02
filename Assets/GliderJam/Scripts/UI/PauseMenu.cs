@@ -100,7 +100,7 @@ namespace GliderJam.UI
 			AudioListener.pause = false;
 			InputSystem.ResetHaptics();
 			GameSettings.Showcase = false;
-			SceneManager.LoadScene(scene);
+			SceneLoader.Load(scene);
 		}
 	}
 }

@@ -33,7 +33,16 @@ namespace GliderJam.UI
 				var raw = bg.gameObject.AddComponent<RawImage>();
 				raw.texture = background;
 				raw.uvRect = FitCover(background);
+				raw.raycastTarget = false;
 				BackgroundImage = raw;
+				// The picture covers the screen: the menu camera only needs to clear it, not render the scene.
+				Camera cam = Camera.main;
+				if (cam != null)
+				{
+					cam.cullingMask = 0;
+					var hd = cam.GetComponent<UnityEngine.Rendering.HighDefinition.HDAdditionalCameraData>();
+					if (hd != null) hd.clearColorMode = UnityEngine.Rendering.HighDefinition.HDAdditionalCameraData.ClearColorMode.Color;
+				}
 			}
 			// Left-side darkening gradient for legibility.
 			var shade = Full("Shade");
@@ -140,7 +149,7 @@ namespace GliderJam.UI
 
 		protected static void Load(string scene)
 		{
-			SceneManager.LoadScene(scene);
+			SceneLoader.Load(scene);
 		}
 
 		protected static void Quit()

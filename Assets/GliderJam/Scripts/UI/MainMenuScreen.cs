@@ -7,10 +7,14 @@ using UnityEngine.UI;
 
 namespace GliderJam.UI
 {
-	// Main menu over a live cinematic flyover: the canyon race scene is loaded additively in showcase mode
-	// (autopilot gliders filmed by the ShowcaseDirector); the static hero image shows while it loads.
+	// Main menu over rendered stills of the maps, slowly zooming and drifting, crossfading to the selected map. (It used
+	// to load the whole canyon behind the menu for a live flyover: seconds of loading freezes and a busy GPU made the
+	// menu laggy.)
 	public class MainMenuScreen : MenuScreen
 	{
+		private RawImage _bgNext;
+		private Texture2D _canyonBg, _cityBg;
+		private float _fadeStart = -1f;
 		private SettingsPanel _settings;
 		private Button _solo;
 		private ChoiceSelectable _map;
@@ -21,14 +25,54 @@ namespace GliderJam.UI
 		protected override void Start()
 		{
 			base.Start();
-			Camera menuCamera = Camera.main;
-			GameSettings.Showcase = true;
-			AsyncOperation op = SceneManager.LoadSceneAsync(GameSettings.RaceScene, LoadSceneMode.Additive);
-			op.completed += _ =>
+			GameSettings.Showcase = false;
+			_canyonBg = Resources.Load<Texture2D>("CanyonBackground") ?? background;
+			_cityBg = Resources.Load<Texture2D>("CityBackground");
+			if (BackgroundImage == null) return;
+			BackgroundImage.gameObject.AddComponent<Canvas>(); // own canvas: the slow zoom doesn't re-batch the whole menu
+			_bgNext = Instantiate(BackgroundImage, BackgroundImage.transform.parent);
+			_bgNext.name = "Background Next";
+			_bgNext.transform.SetSiblingIndex(BackgroundImage.transform.GetSiblingIndex() + 1);
+			_bgNext.color = new Color(1f, 1f, 1f, 0f);
+			ShowMap(false);
+		}
+
+		// The selected map's picture: crossfade to it (or set it straight away).
+		private void ShowMap(bool fade)
+		{
+			Texture2D tex = GameSettings.Map == GameSettings.CityScene && _cityBg != null ? _cityBg : _canyonBg;
+			if (BackgroundImage == null || tex == null || BackgroundImage.texture == tex) return;
+			if (!fade)
 			{
-				if (BackgroundImage != null) BackgroundImage.enabled = false;
-				if (menuCamera != null) menuCamera.enabled = false;
-			};
+				BackgroundImage.texture = tex;
+				BackgroundImage.uvRect = FitCover(tex);
+				return;
+			}
+			_bgNext.texture = tex;
+			_bgNext.uvRect = FitCover(tex);
+			_fadeStart = Time.unscaledTime;
+		}
+
+		private void Update()
+		{
+			if (BackgroundImage == null) return;
+			// Slow zoom and drift (scaled up a little so the edges never show).
+			float t = Time.unscaledTime;
+			float scale = 1.06f + 0.04f * Mathf.Sin(t * 0.13f);
+			var drift = new Vector2(Mathf.Sin(t * 0.07f) * 16f, Mathf.Cos(t * 0.05f) * 9f);
+			foreach (RawImage img in new[] { BackgroundImage, _bgNext })
+			{
+				img.rectTransform.localScale = new Vector3(scale, scale, 1f);
+				img.rectTransform.anchoredPosition = drift;
+			}
+			if (_fadeStart < 0f) return;
+			float a = Mathf.Clamp01((Time.unscaledTime - _fadeStart) / 0.6f);
+			_bgNext.color = new Color(1f, 1f, 1f, a);
+			if (a < 1f) return;
+			BackgroundImage.texture = _bgNext.texture;
+			BackgroundImage.uvRect = _bgNext.uvRect;
+			_bgNext.color = new Color(1f, 1f, 1f, 0f);
+			_fadeStart = -1f;
 		}
 
 		protected override void Build()
@@ -82,7 +126,7 @@ namespace GliderJam.UI
 			TextMeshProUGUI r = UiKit.Text(img.transform, ">", 32f, UiKit.Gold, TextAlignmentOptions.MidlineRight);
 			UiKit.Stretch(r.rectTransform, 0f, 0f, 22f);
 			c.SetIndex(GameSettings.Map == GameSettings.CityScene && city ? 1 : 0, false);
-			c.onChanged = idx => { GameSettings.Map = idx == 1 ? GameSettings.CityScene : GameSettings.RaceScene; Refresh(); };
+			c.onChanged = idx => { GameSettings.Map = idx == 1 ? GameSettings.CityScene : GameSettings.RaceScene; Refresh(); ShowMap(true); };
 			return c;
 		}
 

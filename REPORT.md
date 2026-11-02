@@ -4,7 +4,29 @@ Everything lives on F: (project `F:\glider_jam\GliderJam`, player build `F:\glid
 benchmark logs `F:\glider_jam\Build\Benchmarks`). Unity 6000.3.18f1, HDRP 17.3, D3D12, tested on an
 RX 7900 XT / Ryzen 7 9700X.
 
-## Meetup polish (latest)
+## After the first playtests (latest)
+
+- Respawns follow your own path. Each glider remembers where it flew in the last 20 s (only spots with nothing
+  within 14 m). After a crash it comes back at the newest of those at least 1.2 s before the crash, never ahead
+  of it. It faces whichever of its old heading and turns of 20 or 40 degrees has the most open air, with at least
+  200 m of it. Respawning on the race line let a crash skip the maze.
+- No respawn traps: crashing again at the same spot soon after a respawn sends you further back each time (more
+  open air required, and behind the previous respawn), up to four times. Tested in the canyon with a glider that
+  can't steer: it kept getting past the pillar it had hit instead of looping.
+- No more flying through walls after a respawn: the glider used to be a ghost for 2.5 s (colliders as triggers)
+  and passed through pillars. It's now a 0.4 s blink, and respawn spots are checked for room. The city's round
+  towers also got exact 24-sided colliders; the capsules left their lowest stretch only partly solid.
+- City finish line at neon brightness (it was tuned for the canyon's daylight, about 13x too bright at night).
+- Menu and loading:
+  - The title screen no longer loads the whole canyon behind it for a live flyover (seconds of loading freezes,
+    a busy GPU, laggy input). It shows rendered stills of the maps with a slow zoom and drift, crossfading when
+    you switch maps; about 390 fps in the editor.
+  - Every scene change goes through a loading screen (the map picture, its name, a progress bar, a tip). It loads
+    in the background at high priority and stays up through the new scene's first heavy frames, then fades out.
+    Before, the game simply froze with no feedback.
+  - Opening settings takes about 40 ms and applying a setting under 1 ms; the lag came from the flyover.
+
+## Meetup polish
 
 - City routes: no dead ends, but no long straights either.
   - Each cross street splits the avenues into groups that are connected along it, and every group keeps at least

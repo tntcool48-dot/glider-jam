@@ -225,7 +225,9 @@ namespace GliderJam.Flight
 			OnCrash?.Invoke(this, point, v);
 		}
 
-		public void Respawn(Vector3 position, Quaternion rotation, float ghostSeconds = 2.5f)
+		// Respawn points are checked to be clear (RaceManager), so the ghost time is only a short blink: a long one let
+		// the glider fly straight through walls and pillars after a respawn.
+		public void Respawn(Vector3 position, Quaternion rotation, float ghostSeconds = 0.4f)
 		{
 			_rb.isKinematic = false;
 			_rb.position = position;
@@ -241,7 +243,7 @@ namespace GliderJam.Flight
 			Crashed = false;
 			BoostEnergy = Mathf.Max(BoostEnergy, 0.5f);
 			Ghost = ghostSeconds;
-			SetGhost(true);
+			SetGhost(ghostSeconds > 0f);
 		}
 
 		// While ghosted the glider can't crash (colliders become triggers).

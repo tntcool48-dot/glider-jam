@@ -38,7 +38,18 @@ namespace GliderJam.Race
 			public float nextAlarm;
 			public float wrongWay;
 			public Vector3 crashPoint;
+			public float crashTime;
+			// Where this glider has flown lately, at spots with room around them: respawns go back along it.
+			public readonly Vector3[] trailPos = new Vector3[TrailLength];
+			public readonly Vector3[] trailDir = new Vector3[TrailLength];
+			public readonly float[] trailTime = new float[TrailLength];
+			public int trailCount, trailHead;
+			public float nextTrailAt, lastRespawnAt = -100f;
+			public int quickDeaths; // crashes soon after the last respawn: each sends the next respawn further back
+			public Vector3 lastRespawnPos, prevCrash = Vector3.one * 1e6f;
 		}
+
+		private const int TrailLength = 80; // at 0.25 s: 20 s of flight
 
 		private readonly List<Player> _players = new List<Player>();
 		private float _raceStart = -1f;
@@ -215,6 +226,7 @@ namespace GliderJam.Race
 					Finish(i, p);
 				}
 				p.prevPos = pos;
+				if (Running && !p.finished && Time.time >= p.nextTrailAt) RecordTrail(p);
 				if (p.respawnAt > 0f && Time.time >= p.respawnAt)
 				{
 					Respawn(p);
@@ -369,7 +381,7 @@ namespace GliderJam.Race
 		{
 			p.wrongWay = 0f;
 			Vector3 pos = p.glider.transform.position;
-			p.glider.Respawn(pos, Quaternion.LookRotation(Vector3.forward), 1.5f);
+			p.glider.Respawn(pos, Quaternion.LookRotation(Vector3.forward));
 			p.prevPos = pos;
 			p.visuals.ClearTrails();
 			p.cam.Snap();
@@ -421,22 +433,97 @@ namespace GliderJam.Race
 			p.hud.ShowMessage(outOfBounds ? "OUT OF BOUNDS" : "CRASHED", "respawning", new Color(1f, 0.4f, 0.3f), respawnDelay);
 			Rumble(i, p, 1f, 1f, 0.55f);
 			p.crashPoint = point;
+			p.crashTime = Time.time;
 			p.respawnAt = Time.time + respawnDelay;
+			// Stuck: crashed again at the same spot soon after respawning (not just crashed somewhere new).
+			bool again = Time.time - p.lastRespawnAt < 10f && (point - p.prevCrash).sqrMagnitude < 200f * 200f;
+			p.quickDeaths = again ? Mathf.Min(p.quickDeaths + 1, 4) : 0;
+			p.prevCrash = point;
 		}
 
-		// Back on the (known-clear) race line a little behind the crash.
+		// Every 0.25 s, remember where the glider is if it has room there (nothing within 14 m, well under the ceiling).
+		private void RecordTrail(Player p)
+		{
+			p.nextTrailAt = Time.time + 0.25f;
+			GliderController g = p.glider;
+			Vector3 v = Vector3.ProjectOnPlane(g.Velocity, Vector3.up);
+			if (g.Crashed || g.Ghost > 0f || g.OutOfBounds || g.CloseCall || v.sqrMagnitude < 900f) return;
+			Vector3 pos = g.transform.position;
+			if (pos.y > route.ceiling - 15f) return;
+			p.trailPos[p.trailHead] = pos;
+			p.trailDir[p.trailHead] = v.normalized;
+			p.trailTime[p.trailHead] = Time.time;
+			p.trailHead = (p.trailHead + 1) % TrailLength;
+			p.trailCount = Mathf.Min(p.trailCount + 1, TrailLength);
+		}
+
+		// Respawn back along the glider's own path, never on the race line (that let a crash skip the maze) and never
+		// ahead of the crash: the newest remembered spot at least 1.2 s before the crash with room around it, facing
+		// whichever of its heading and a few turns either side has the most open air, at least 200 m of it. Crashing
+		// again soon after a respawn asks for 100 m more open air and a spot further back than the last respawn each
+		// time, so a hard place gets a longer run-up instead of the same respawn over and over.
 		private void Respawn(Player p)
 		{
 			p.respawnAt = -1f;
 			p.wrongWay = 0f;
-			int pathIndex = Mathf.Min(route.IndexAtZ(p.crashPoint.z - 120f), route.checkpoints[route.CheckpointCount - 1] - 4);
-			pathIndex = Mathf.Max(0, pathIndex);
-			Vector3 pos = route.path[pathIndex];
-			Vector3 fwd = Vector3.ProjectOnPlane(route.path[Mathf.Min(route.path.Length - 1, pathIndex + 3)] - pos, Vector3.up).normalized;
-			p.glider.Respawn(pos, Quaternion.LookRotation(fwd));
+			float minAge = 1.2f + 1.2f * p.quickDeaths, runway = Mathf.Min(200f + 100f * p.quickDeaths, 450f);
+			float maxZ = p.quickDeaths > 0 ? Mathf.Min(p.crashPoint.z, p.lastRespawnPos.z - 60f * p.quickDeaths) : p.crashPoint.z + 20f;
+			Vector3 pos = Vector3.zero, dir = Vector3.forward;
+			bool found = false;
+			for (int n = 0; n < p.trailCount && !found; n++)
+			{
+				int k = (p.trailHead - 1 - n + TrailLength) % TrailLength;
+				if (p.crashTime - p.trailTime[k] < minAge || p.trailPos[k].z > maxZ || !RoomAround(p.trailPos[k])) continue;
+				pos = p.trailPos[k];
+				Vector3 heading = p.trailDir[k].z < -0.3f ? Vector3.forward : p.trailDir[k]; // was heading back: face the finish
+				float best = 0f;
+				foreach (float yaw in new[] { 0f, -20f, 20f, -40f, 40f })
+				{
+					Vector3 d = Quaternion.Euler(0f, yaw, 0f) * heading;
+					if (d.z < -0.3f) continue;
+					float open = OpenAhead(pos, d) - Mathf.Abs(yaw); // prefer the glider's own heading on near ties
+					if (open > best) { best = open; dir = d; }
+				}
+				found = best >= runway;
+			}
+			if (!found)
+			{
+				// Nothing remembered (crashed right after the start): the race line, behind the crash.
+				int i = Mathf.Clamp(route.IndexAtZ(p.crashPoint.z - 150f - 80f * p.quickDeaths), 0, route.checkpoints[route.CheckpointCount - 1] - 4);
+				pos = route.path[i];
+				dir = Vector3.ProjectOnPlane(route.path[Mathf.Min(route.path.Length - 1, i + 3)] - pos, Vector3.up).normalized;
+			}
+			p.glider.Respawn(pos, Quaternion.LookRotation(dir));
+			Debug.Log("[GliderJam] respawn P" + (p.glider.PlayerIndex + 1) + " at " + pos.ToString("F0") + " (crash at " + p.crashPoint.ToString("F0")
+				+ ", " + (found ? "own path" : "race line") + ", quick crashes " + p.quickDeaths + ")");
+			p.lastRespawnAt = Time.time;
+			p.lastRespawnPos = pos;
 			p.prevPos = pos;
 			p.visuals.ClearTrails();
 			p.cam.Snap();
+		}
+
+		private static readonly Collider[] RoomHits = new Collider[8];
+		private static readonly RaycastHit[] AheadHits = new RaycastHit[16];
+
+		// Nothing static within 10 m.
+		private static bool RoomAround(Vector3 pos)
+		{
+			int n = Physics.OverlapSphereNonAlloc(pos, 10f, RoomHits, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+			for (int k = 0; k < n; k++) if (RoomHits[k].attachedRigidbody == null) return false;
+			return true;
+		}
+
+		// Open air ahead (a 14 m wide sweep, up to 500 m) before the static world.
+		private static float OpenAhead(Vector3 pos, Vector3 dir)
+		{
+			float open = 500f;
+			int n = Physics.SphereCastNonAlloc(pos, 7f, dir, AheadHits, 500f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+			for (int k = 0; k < n; k++)
+			{
+				if (AheadHits[k].collider.attachedRigidbody == null) open = Mathf.Min(open, AheadHits[k].distance);
+			}
+			return open;
 		}
 
 		private void FinishRace()
@@ -451,7 +538,7 @@ namespace GliderJam.Race
 				GameSettings.FinishTimes[i] = has ? _players[i].finishTime : 0f;
 				GameSettings.MissedCheckpoints[i] = 0;
 			}
-			SceneManager.LoadScene(GameSettings.EndScene);
+			UI.SceneLoader.Load(GameSettings.EndScene);
 		}
 
 		// ---------------------------------------------------------------- menu showcase
@@ -507,9 +594,18 @@ namespace GliderJam.Race
 
 		// ---------------------------------------------------------------- finish line
 
-		// Free route: a line of glowing gold pillars and bars across the whole course at the finish.
+		// Free route: a line of glowing gold pillars and bars across the whole course at the finish. Its glow is set for the
+		// canyon's daylight; the night city (much brighter exposure) gets a copy at neon brightness.
+		private Material _finishMaterial;
+
 		private void BuildFinishLine()
 		{
+			_finishMaterial = fx.ringFinish;
+			if (gameObject.scene.name == GameSettings.CityScene)
+			{
+				_finishMaterial = new Material(fx.ringFinish);
+				_finishMaterial.SetColor("_EmissiveColor", fx.ringFinish.GetColor("_EmissiveColor") * 0.09f);
+			}
 			var root = new GameObject("Finish Line").transform;
 			float z = route.FinishZ, top = route.ceiling;
 			float x0 = float.IsInfinity(route.minX) ? route.CheckpointPosition(route.CheckpointCount - 1).x - 500f : route.minX;
@@ -533,7 +629,7 @@ namespace GliderJam.Race
 			b.transform.position = center;
 			b.transform.localScale = size;
 			var mr = b.GetComponent<MeshRenderer>();
-			mr.sharedMaterial = fx.ringFinish;
+			mr.sharedMaterial = _finishMaterial;
 			mr.shadowCastingMode = ShadowCastingMode.Off;
 		}
 

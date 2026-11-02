@@ -859,6 +859,30 @@ namespace GliderJam.EditorTools
 			}
 		}
 
+		// Collider for round towers: a prism of radius 1 from y = 0 to 1 with the same corners as Circle().
+		private static Mesh UnitPrism(int seg)
+		{
+			var v = new List<Vector3>();
+			for (int i = 0; i < seg; i++)
+			{
+				float a = i * Mathf.PI * 2f / seg;
+				v.Add(new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)));
+				v.Add(new Vector3(Mathf.Cos(a), 1f, Mathf.Sin(a)));
+			}
+			var tris = new List<int>();
+			for (int i = 0; i < seg; i++)
+			{
+				int a = i * 2, b = (i + 1) % seg * 2;
+				tris.AddRange(new[] { a, a + 1, b, b, a + 1, b + 1 });
+			}
+			var m = new Mesh { name = "RoundTowerCollider" };
+			m.SetVertices(v);
+			m.SetTriangles(tris, 0); // the convex hull is what collides; caps come with it
+			m.RecalculateBounds();
+			AssetDatabase.CreateAsset(m, Dir + "/Meshes/RoundTowerCollider.asset");
+			return m;
+		}
+
 		private static Vector2[] Circle(Bounds t, float r, int seg)
 		{
 			var p = new Vector2[seg];
@@ -1271,15 +1295,20 @@ namespace GliderJam.EditorTools
 			}
 			var round = new GameObject("Round Towers");
 			round.transform.SetParent(root, false);
+			// Exact 24-sided prisms (a unit convex mesh scaled per tower). Capsules left the lowest radius' worth of each
+			// tower only partly solid, so gliders could clip into the round towers near their base.
+			Mesh prism = UnitPrism(24);
 			for (int i = 0; i + 1 < Cylinders.Count; i += 2)
 			{
 				Vector4 c = Cylinders[i];
 				float hgt = Cylinders[i + 1].x;
-				var cap = round.AddComponent<CapsuleCollider>();
-				cap.direction = 1;
-				cap.radius = c.w;
-				cap.height = hgt; // rounded ends stay inside the tower (no invisible dome above the roof)
-				cap.center = new Vector3(c.x, c.y + hgt * 0.5f, c.z);
+				var tower = new GameObject("Round Tower");
+				tower.transform.SetParent(round.transform, false);
+				tower.transform.position = new Vector3(c.x, c.y, c.z);
+				tower.transform.localScale = new Vector3(c.w, hgt, c.w);
+				var mc = tower.AddComponent<MeshCollider>();
+				mc.sharedMesh = prism;
+				mc.convex = true;
 			}
 			var ground = new GameObject("Ground and Water");
 			ground.transform.SetParent(root, false);
