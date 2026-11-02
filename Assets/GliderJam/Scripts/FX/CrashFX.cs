@@ -31,10 +31,13 @@ namespace GliderJam.FX
 			var light = lightGo.AddComponent<Light>();
 			light.type = LightType.Point;
 			light.color = new Color(1f, 0.55f, 0.2f);
-			light.range = 450f;
+			// The flash is sized for the canyon's daylight exposure; at night in the city that much light whited out
+			// both players' views, so it is far weaker and shorter-reaching there.
+			bool night = GameSettings.Map == GameSettings.CityScene;
+			light.range = night ? 220f : 450f;
 			light.lightUnit = UnityEngine.Rendering.LightUnit.Lumen;
 			light.intensity = 0f;
-			lightGo.AddComponent<FlashFade>().peak = 6e7f;
+			lightGo.AddComponent<FlashFade>().peak = night ? 2.5e6f : 6e7f;
 
 			foreach (FollowCamera cam in cams)
 			{

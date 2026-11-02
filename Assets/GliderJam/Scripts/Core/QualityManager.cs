@@ -217,7 +217,7 @@ namespace GliderJam
 				: cfg.antiAliasing == 2 ? HDAdditionalCameraData.AntialiasingMode.SubpixelMorphologicalAntiAliasing
 				: HDAdditionalCameraData.AntialiasingMode.TemporalAntialiasing;
 			hd.TAAQuality = cfg.preset >= QualityPreset.Ultra ? HDAdditionalCameraData.TAAQualityLevel.High : HDAdditionalCameraData.TAAQualityLevel.Medium;
-			bool dynamic = cfg.renderScale < 100 || cfg.autoResolution;
+			bool dynamic = cfg.renderScale < 100 || (cfg.autoResolution && !(cfg.UsesRayTracing && RayTracingAllowed)); // see AutoResolution
 			cam.allowDynamicResolution = dynamic;
 			hd.allowDynamicResolution = dynamic;
 			DynamicResolutionHandler.SetUpscaleFilter(cam, cfg.upscaler == 0 ? DynamicResUpscaleFilter.CatmullRom : cfg.upscaler == 2 ? DynamicResUpscaleFilter.EdgeAdaptiveScalingUpres : DynamicResUpscaleFilter.TAAU);

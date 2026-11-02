@@ -2,25 +2,29 @@ using UnityEngine;
 
 namespace GliderJam
 {
-	// "Auto resolution": holds 60 fps on slower PCs by lowering the internal render resolution (down to 50%,
+	// "Auto resolution": holds 60 fps on slower PCs by lowering the internal render resolution (down to 67%,
 	// upscaled to the screen) while the GPU can't keep up, and raising it back when it can. Driven by measured GPU
-	// frame time; the Render Scale setting is the ceiling, so a fast PC simply stays at full resolution.
+	// frame time; the Render Scale setting is the ceiling, so a fast PC simply stays at full resolution. Off while
+	// ray tracing is on: that is a looks-first choice, and its denoisers smear when the resolution keeps changing
+	// (split-screen ray tracing pinned it at 50%, which looked broken).
 	public class AutoResolution : MonoBehaviour
 	{
 		public static float Percent { get; private set; } = 100f;
 
 		// The render scale the cameras use right now.
-		public static float Scale(GameConfig cfg) => cfg.autoResolution ? Mathf.Min(Percent, cfg.renderScale) : cfg.renderScale;
+		public static float Scale(GameConfig cfg) => Active(cfg) ? Mathf.Min(Percent, cfg.renderScale) : cfg.renderScale;
+
+		private static bool Active(GameConfig cfg) => cfg.autoResolution && !(cfg.UsesRayTracing && QualityManager.RayTracingAllowed);
 
 		private const float Budget = 1000f / 60f * 0.88f; // GPU ms per frame to aim for, with headroom under 16.7 ms
-		private const float Min = 50f;
+		private const float Min = 67f; // below this the upscaled image turns blocky
 		private readonly FrameTiming[] _timing = new FrameTiming[1];
 		private float _avg, _nextStep;
 
 		private void Update()
 		{
 			GameConfig cfg = GameConfig.Current;
-			if (!cfg.autoResolution)
+			if (!Active(cfg))
 			{
 				Percent = cfg.renderScale;
 				return;
@@ -33,14 +37,14 @@ namespace GliderJam
 			if (ms <= 0f || ms > 120f) return; // loading hitches say nothing about the steady load
 			_avg = _avg <= 0f ? ms : Mathf.Lerp(_avg, ms, 0.08f);
 			if (Time.unscaledTime < _nextStep) return;
-			_nextStep = Time.unscaledTime + 0.4f;
+			_nextStep = Time.unscaledTime + 1f; // gentle: every change costs the temporal effects a little history
 
 			// GPU cost goes roughly with the pixel count, i.e. with the square of the scale.
 			float budget = gpu ? Budget : 18.5f;
 			float max = cfg.renderScale, p = Mathf.Min(Percent, max);
 			if (_avg > budget * 1.05f)
 			{
-				p = Mathf.Max(Min, Mathf.Max(p * Mathf.Sqrt(budget / _avg), p - 15f));
+				p = Mathf.Max(Min, Mathf.Max(p * Mathf.Sqrt(budget / _avg), p - 10f));
 			}
 			else if (p < max && _avg * Sq((p + 5f) / p) < (gpu ? Budget * 0.92f : 14f))
 			{
